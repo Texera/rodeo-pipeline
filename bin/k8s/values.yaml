@@ -301,9 +301,9 @@ workflowComputingUnitPool:
     port: 8085
     targetPort: 8085
 
-# Environments: images built from a user's Dockerfile, which a computing unit can
-# then be started from. See docs/environments.md.
-environments:
+# Runtime images: the image a computing unit runs, built from a user's Dockerfile.
+# See docs/runtime-images.md.
+runtimeImages:
   enabled: true
   # Image that runs the build. BuildKit rather than Kaniko, which was archived in
   # June 2025; rootless so the build needs no privileged pod.
@@ -326,13 +326,13 @@ environments:
   buildMemoryRequest: 2Gi
   buildCpuLimit: "6"
   buildMemoryLimit: 12Gi
-  # What a new environment's editor is pre-filled with, and what user Dockerfiles
+  # What a new runtime image's editor is pre-filled with, and what user Dockerfiles
   # are expected to build FROM. Pushed into the registry by bin/k8s/push-base-image.sh.
   baseImage: 10.96.0.99:5000/texera/computing-unit-master:dev
 
-environmentRegistry:
+runtimeImageRegistry:
   enabled: true
-  name: texera-environment-registry
+  name: texera-runtime-image-registry
   image: registry:2
   port: 5000
   # Pinned rather than assigned: an image reference embeds this address, so it has

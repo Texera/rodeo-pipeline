@@ -51,6 +51,9 @@ import { THROTTLE_TIME_MS } from "../../hub/component/workflow/detail/hub-workfl
 import { WorkflowCompilingService } from "../service/compile-workflow/workflow-compiling.service";
 import { USER_WORKSPACE } from "../../app-routing.constant";
 import { GuiConfigService } from "../../common/service/gui-config.service";
+import { NzButtonComponent } from "ng-zorro-antd/button";
+import { NzIconDirective } from "ng-zorro-antd/icon";
+import { AiEditModeService } from "../service/ai-edit-mode/ai-edit-mode.service";
 import { ComputingUnitStatusService } from "../../common/service/computing-unit/computing-unit-status/computing-unit-status.service";
 import { ExecuteWorkflowService } from "../service/execute-workflow/execute-workflow.service";
 import { WorkflowResultService } from "../service/workflow-result/workflow-result.service";
@@ -85,9 +88,12 @@ export const SAVE_DEBOUNCE_TIME_IN_MS = 5000;
     NgIf,
     AgentPanelComponent,
     PropertyEditorComponent,
+    NzButtonComponent,
+    NzIconDirective,
   ],
 })
 export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
+  public aiEditMode: boolean = false;
   public pid?: number = undefined;
   public writeAccess: boolean = false;
   public isLoading: boolean = false;
@@ -130,7 +136,8 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
     private changeDetectorRef: ChangeDetectorRef,
     private computingUnitStatusService: ComputingUnitStatusService,
     private executeWorkflowService: ExecuteWorkflowService,
-    private workflowResultService: WorkflowResultService
+    private workflowResultService: WorkflowResultService,
+    private aiEditModeService: AiEditModeService
   ) {}
 
   ngOnInit() {
@@ -154,6 +161,13 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
       .getConnectionResetStream()
       .pipe(untilDestroyed(this))
       .subscribe(() => this.resetWorkflowSessionState());
+    this.aiEditModeService
+      .getActiveStream()
+      .pipe(untilDestroyed(this))
+      .subscribe(active => {
+        this.aiEditMode = active;
+        this.changeDetectorRef.detectChanges();
+      });
   }
 
   ngAfterViewInit(): void {
@@ -351,5 +365,14 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
 
   public get copilotEnabled(): boolean {
     return this.config.env.copilotEnabled;
+  }
+
+  public exitAiEditMode(): void {
+    this.aiEditModeService.exit();
+  }
+
+  @HostListener("document:keydown.escape")
+  public onEscape(): void {
+    this.aiEditModeService.exit();
   }
 }

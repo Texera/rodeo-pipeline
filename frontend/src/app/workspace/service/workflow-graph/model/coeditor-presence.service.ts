@@ -208,6 +208,16 @@ export class CoeditorPresenceService {
     const existingPointer: joint.dia.Cell | undefined = this.jointGraph.getCell(
       JointUIService.getJointUserPointerName(coeditorState.user)
     );
+
+    // An agent has no pointer to follow. It edits through the API rather than
+    // by moving a mouse, so a cursor would sit wherever it was first drawn and
+    // never move again -- which reads as a frozen participant rather than one
+    // that is working. The operator halo already says where it is.
+    if (coeditorState.user.isAgent) {
+      existingPointer?.remove();
+      return;
+    }
+
     const userColor = coeditorState.user.color;
     if (existingPointer) {
       if (coeditorState.isActive) {

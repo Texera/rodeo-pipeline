@@ -32,8 +32,9 @@ import {
 } from "@texera/sdk";
 import type { McpContext } from "../context";
 import { ToolError } from "../errors";
-import { formatTable, formatTimestamp, joinSections } from "../format";
+import { formatTable, formatTimestamp, joinSections, workflowUrl } from "../format";
 import { registerTool } from "../register";
+import { openSession } from "./workflow-edit";
 
 export function registerWorkflowTools(server: McpServer, context: McpContext): void {
   registerTool(server, context, {
@@ -86,7 +87,10 @@ export function registerWorkflowTools(server: McpServer, context: McpContext): v
     title: "Create an empty workflow",
     description:
       "Create a new, empty workflow owned by this account and open it for editing. " +
-      "Follow with workflow_add_operator to build the graph, then workflow_save.",
+      "STOP when this returns. Reply to the user with the link it gives you, ask them to open it, and " +
+      "call no further tools until they answer. Building the graph is minutes of uninterrupted tool " +
+      "calls, and a user who has not opened the canvas first sees none of it.\n\n" +
+      "Once they confirm, continue with workflow_add_operator to build the graph, then workflow_save.",
     inputSchema: {
       name: z.string().min(1).describe("Workflow name"),
       description: z.string().optional().describe("Human-readable description"),
@@ -95,30 +99,20 @@ export function registerWorkflowTools(server: McpServer, context: McpContext): v
       const created = await createWorkflow(ctx.client, { name: args.name, description: args.description });
       const wid = created.workflow.wid;
 
-      // Open it immediately: creating a workflow is only ever a prelude to
-      // editing it, and this removes a guaranteed extra round-trip.
-      const fetched = await retrieveWorkflowWithPrivilege(ctx.client, wid);
-      ctx.sessions.open(
-        {
-          wid,
-          name: fetched.name,
-          description: fetched.description,
-          content: {
-            operators: [],
-            operatorPositions: {},
-            links: [],
-            commentBoxes: [],
-            settings: { dataTransferBatchSize: 400 },
-          },
-          lastModifiedTime: fetched.lastModifiedTime,
-          isPublic: fetched.isPublished,
-        },
-        false
-      );
+      // Open it through the same path workflow_open uses, so the shared-editing
+      // room is joined here too. Opening it any other way leaves the client
+      // editing detached: the operators only appear once someone reloads, which
+      // is exactly the opposite of what a user watching the canvas expects.
+      const { liveNote } = await openSession(ctx, wid);
 
-      return (
-        `Created workflow ${wid} "${created.workflow.name}" and opened it for editing.\n` +
-        `Add operators with workflow_add_operator, then call workflow_save.`
+      return joinSections(
+        `Created workflow ${wid} "${created.workflow.name}" and opened it for editing.`,
+        `Open it here: ${workflowUrl(ctx.config.baseUrl, wid)}`,
+        liveNote,
+        `STOP HERE. Do not call another tool yet.\n` +
+          `Reply to the user now, in plain text: give them the link above, say you will build the ` +
+          `workflow there, and ask them to open it and tell you when they can see it. End your turn.\n` +
+          `When they confirm, build the graph with workflow_add_operator, then workflow_save.`
       );
     },
   });

@@ -32,6 +32,18 @@ class ModelMountManagerSpec extends AnyFlatSpec with Matchers {
     }
   }
 
+  "ensureAllMounted" should "do nothing when the region names no models" in {
+    noException should be thrownBy ModelMountManager.ensureAllMounted(Set.empty)
+  }
+
+  it should "reject the same locators ensureMounted rejects" in {
+    for (bad <- Seq("no-colon", "", ":", "repo:", ":commit")) {
+      withClue(s"locator '$bad': ") {
+        an[IllegalArgumentException] should be thrownBy ModelMountManager.ensureAllMounted(Set(bad))
+      }
+    }
+  }
+
   "mountPointOf" should "place a version under <root>/<repository>/<commit> without mounting it" in {
     ModelMountManager.mountPointOf("model-15:abc123").toString shouldBe
       "/mnt/texera-mounts/model-15/abc123"

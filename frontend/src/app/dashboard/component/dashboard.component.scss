@@ -146,3 +146,10 @@ nz-content {
   max-height: 100%;
   overflow: hidden;
 }
+
+// AI edit mode (see AiEditModeService): the workspace route renders inside this
+// layout, so the navigation sider has to be hidden from here. .page-container is
+// a flex sibling with no left offset, so it simply expands into the space.
+.ai-hidden {
+  display: none !important;
+}

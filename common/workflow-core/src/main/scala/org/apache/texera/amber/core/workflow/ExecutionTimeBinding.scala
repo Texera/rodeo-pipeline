@@ -42,9 +42,9 @@ trait ExecutionTimeBinding {
   def opExecInitInfo: OpExecInitInfo
 
   /**
-    * Model versions this operator's workers have to mount before they can run:
-    * variable name -> locator "<repositoryName>:<commitHash>". Empty when the operator
-    * names no models.
+    * Model versions that have to be mounted before this operator can run: variable name ->
+    * locator "<repositoryName>:<commitHash>". Mounting them is the region scheduler's job,
+    * not the operator's. Empty when the operator names no models.
     */
   def mountedModels: Map[String, String]
 }

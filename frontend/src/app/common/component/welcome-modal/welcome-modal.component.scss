@@ -1,0 +1,280 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+$ink: #1f2430;
+$muted: #6b7280;
+$line: #e8eaef;
+$accent: #2f54eb;
+
+:host {
+  display: block;
+  color: $ink;
+}
+
+// ---------- step 0 ----------
+
+.hero {
+  text-align: center;
+  padding: 4px 8px 8px;
+}
+
+.hero-mark {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2f54eb 0%, #7d4dff 100%);
+  color: #fff;
+  font-size: 24px;
+  box-shadow: 0 6px 18px rgba(47, 84, 235, 0.28);
+}
+
+.hero-title {
+  margin: 0 0 6px;
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+}
+
+.hero-subtitle {
+  margin: 0;
+  color: $muted;
+  font-size: 14px;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 22px 0 8px;
+}
+
+// One column below the modal's own breakpoint, so the cards never squeeze.
+@media (max-width: 660px) {
+  .choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+.choice {
+  border: 1px solid $line;
+  border-radius: 12px;
+  padding: 18px 16px 16px;
+  background: #fff;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 6px 20px rgba(31, 36, 48, 0.07);
+    transform: translateY(-1px);
+  }
+
+  h3 {
+    margin: 12px 0 6px;
+    font-size: 15px;
+    font-weight: 620;
+  }
+
+  p {
+    margin: 0 0 12px;
+    color: $muted;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}
+
+.choice-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+
+  &.assistant {
+    background: #eef2ff;
+    color: #4338ca;
+  }
+
+  &.mcp {
+    background: #fdf0e9;
+    color: #c2410c;
+  }
+}
+
+.choice-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 560;
+  padding: 2px 9px;
+  border-radius: 999px;
+
+  &.ready {
+    background: #ecfdf3;
+    color: #047857;
+  }
+
+  &.setup {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+}
+
+// ---------- step 1 ----------
+
+.setup-head {
+  padding: 2px 2px 4px;
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.2px;
+  }
+
+  p {
+    margin: 0;
+    color: $muted;
+    font-size: 13.5px;
+  }
+}
+
+.steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 18px 0 4px;
+  padding: 0;
+
+  li {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 18px 38px;
+
+    // The connecting rail stops at the last item rather than trailing off it.
+    &:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      left: 12px;
+      top: 26px;
+      bottom: 2px;
+      width: 1px;
+      background: $line;
+    }
+
+    &::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: $accent;
+      color: #fff;
+      font-size: 12.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+}
+
+.step-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 2px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-body {
+  color: $muted;
+  font-size: 13px;
+  line-height: 1.6;
+
+  code {
+    background: #f4f5f7;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12.5px;
+    color: $ink;
+  }
+}
+
+.inline-action {
+  padding: 0 4px;
+  height: auto;
+  font-size: 12.5px;
+}
+
+.snippet {
+  margin: 6px 0 0;
+  padding: 12px 14px;
+  background: #0f1115;
+  color: #e6e8ec;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.55;
+  // A long token must not push the dialog wide; it scrolls inside its own box.
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.token-note {
+  margin: 0 0 10px;
+}
+
+.token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token {
+  flex: 1;
+  min-width: 0;
+  background: #f4f5f7;
+  border: 1px solid $line;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: $ink;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+// ---------- shared ----------
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid $line;
+}

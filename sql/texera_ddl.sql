@@ -253,18 +253,20 @@ CREATE TABLE IF NOT EXISTS virtual_environments
     UNIQUE (uid, name)
 );
 
--- A Dockerfile a user owns, and the image built from it, which a computing unit can
--- then be started from. Supersedes virtual_environments for that choice: a virtual
--- environment can only add pip packages to the engine image's own interpreter, so it
--- cannot express a different Python, a system package or a compiler.
-CREATE TABLE IF NOT EXISTS environment
+-- A runtime image: the image a computing unit runs, built from a Dockerfile its owner
+-- wrote. Supersedes virtual_environments for that choice -- a virtual environment can
+-- only add pip packages to the engine image's own interpreter, so it cannot express a
+-- different Python, a system package or a compiler.
+--
+-- riid rather than eid, because eid is already the primary key of workflow_executions.
+CREATE TABLE IF NOT EXISTS runtime_image
 (
-    eid           SERIAL PRIMARY KEY,
+    riid          SERIAL PRIMARY KEY,
     uid           INT          NOT NULL,
     name          VARCHAR(128) NOT NULL,
     dockerfile    TEXT         NOT NULL,
     -- PENDING once created or edited, BUILDING while a job runs, then READY or FAILED.
-    -- A computing unit may only start from an environment that is READY.
+    -- A computing unit may only start from a runtime image that is READY.
     status        VARCHAR(16)  NOT NULL DEFAULT 'PENDING',
     -- Where the built image can be pulled from. Null until a build first succeeds.
     image_tag     VARCHAR(512),
@@ -274,13 +276,32 @@ CREATE TABLE IF NOT EXISTS environment
     -- The build's output, kept here so it can still be read once the job that
     -- produced it has been cleaned up.
     build_log     TEXT,
+    -- FALSE, unlike dataset.is_public and model.is_public, which default TRUE. A runtime
+    -- image is built from instructions its owner wrote, so publishing it offers other
+    -- people something to execute; that is a choice to make deliberately rather than the
+    -- state a runtime image starts in.
+    is_public     BOOLEAN      NOT NULL DEFAULT FALSE,
     creation_time TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (uid) REFERENCES "user"(uid) ON DELETE CASCADE,
     UNIQUE (uid, name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_environment_uid ON environment (uid);
+CREATE INDEX IF NOT EXISTS idx_runtime_image_uid ON runtime_image (uid);
+
+-- runtime_image_user_access
+CREATE TABLE IF NOT EXISTS runtime_image_user_access
+(
+    riid      INT NOT NULL,
+    uid       INT NOT NULL,
+    privilege privilege_enum NOT NULL DEFAULT 'NONE',
+    PRIMARY KEY (riid, uid),
+    FOREIGN KEY (riid) REFERENCES runtime_image (riid) ON DELETE CASCADE,
+    FOREIGN KEY (uid) REFERENCES "user" (uid) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_runtime_image_user_access_uid
+    ON runtime_image_user_access (uid);
 
 -- workflow_executions
 CREATE TABLE IF NOT EXISTS workflow_executions

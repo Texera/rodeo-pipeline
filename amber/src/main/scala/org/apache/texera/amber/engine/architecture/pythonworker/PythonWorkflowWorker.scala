@@ -38,7 +38,6 @@ import org.apache.texera.amber.engine.architecture.scheduling.config.WorkerConfi
 import org.apache.texera.amber.engine.common.actormessage.{Backpressure, CreditUpdate}
 import org.apache.texera.amber.engine.common.ambermessage.WorkflowMessage.getInMemSize
 import org.apache.texera.amber.engine.common.ambermessage._
-import org.apache.texera.amber.core.storage.ModelMountManager
 import org.apache.texera.amber.engine.common.{CheckpointState, Utils}
 import org.apache.texera.amber.util.JSONUtils.objectMapper
 
@@ -252,12 +251,10 @@ class PythonWorkflowWorker(
 
     val pythonBin: String = choosePythonBin()
 
-    // Mount every model version this operator's UI parameters name, before the Python
-    // process starts. The paths themselves were bound into the generated code when the
-    // execution started, so nothing is passed along here -- this is only about making
-    // sure the directories those paths point at exist, on whichever node this worker
-    // happens to have landed on.
-    workerConfig.mountedModels.values.foreach(ModelMountManager.ensureMounted)
+    // Nothing about models is done here: the mount paths were bound into the generated
+    // code when the execution started, and the mounts themselves are made once per region
+    // by the scheduler (see RegionExecutionManager.mountRegionModels) before that code is
+    // handed to any executor -- which is later than this process starts.
 
     // Pass startup configuration to the Python worker by name, as a single JSON
     // object, rather than by argv position. This way the two sides agree by key,

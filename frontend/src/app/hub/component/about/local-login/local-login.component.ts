@@ -27,6 +27,7 @@ import { catchError } from "rxjs/operators";
 import { throwError } from "rxjs";
 import { USER_WORKFLOW } from "../../../../app-routing.constant";
 import { GuiConfigService } from "../../../../common/service/gui-config.service";
+import { WelcomeService } from "../../../../common/service/welcome/welcome.service";
 import { NzTabsComponent, NzTabComponent } from "ng-zorro-antd/tabs";
 import { NgIf } from "@angular/common";
 import { NzFormDirective, NzFormItemComponent, NzFormControlComponent } from "ng-zorro-antd/form";
@@ -72,7 +73,8 @@ export class LocalLoginComponent implements OnInit {
     private route: ActivatedRoute,
     private notificationService: NotificationService,
     private router: Router,
-    private config: GuiConfigService
+    private config: GuiConfigService,
+    private welcomeService: WelcomeService
   ) {
     this.allForms = this.formBuilder.group({
       loginUsername: new FormControl("", [Validators.required]),
@@ -132,7 +134,15 @@ export class LocalLoginComponent implements OnInit {
         }),
         untilDestroyed(this)
       )
-      .subscribe(() => this.router.navigateByUrl(this.route.snapshot.queryParams["returnUrl"] || USER_WORKFLOW));
+      .subscribe(() => {
+        this.router.navigateByUrl(this.route.snapshot.queryParams["returnUrl"] || USER_WORKFLOW);
+        // After the navigation, so the dialog opens over the workspace the user
+        // just landed on rather than over the sign-in form they are leaving.
+        const user = this.userService.getCurrentUser();
+        if (user) {
+          this.welcomeService.open(user.name);
+        }
+      });
   }
 
   /**

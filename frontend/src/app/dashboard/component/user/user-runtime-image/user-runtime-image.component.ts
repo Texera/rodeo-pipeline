@@ -32,10 +32,17 @@ import { NzTagComponent } from "ng-zorro-antd/tag";
 import { NzTooltipDirective } from "ng-zorro-antd/tooltip";
 
 import { NotificationService } from "../../../../common/service/notification/notification.service";
-import { Environment, EnvironmentService, EnvironmentStatus } from "../../../service/user/environment/environment.service";
+import {
+  RuntimeImage,
+  RuntimeImageService,
+  RuntimeImageStatus,
+  isEditable,
+  isOwned,
+} from "../../../service/user/runtime-image/runtime-image.service";
+import { ShareAccessComponent } from "../share-access/share-access.component";
 
-/** Name rule, kept in step with EnvironmentResource's server-side check. */
-export function validateEnvironmentName(name: string): string | null {
+/** Name rule, kept in step with RuntimeImageResource's server-side check. */
+export function validateRuntimeImageName(name: string): string | null {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) || name.length > 128) {
     return "Name must start with a letter or digit and contain only letters, digits, dots, hyphens and underscores.";
   }
@@ -46,9 +53,9 @@ const BUILD_POLL_INTERVAL_MS = 3000;
 
 @UntilDestroy()
 @Component({
-  selector: "texera-user-environment",
-  templateUrl: "./user-environment.component.html",
-  styleUrls: ["./user-environment.component.scss"],
+  selector: "texera-user-runtime-image",
+  templateUrl: "./user-runtime-image.component.html",
+  styleUrls: ["./user-runtime-image.component.scss"],
   imports: [
     NgIf,
     NgFor,
@@ -65,29 +72,29 @@ const BUILD_POLL_INTERVAL_MS = 3000;
   ],
   standalone: true,
 })
-export class UserEnvironmentComponent implements OnInit {
-  environments: Environment[] = [];
+export class UserRuntimeImageComponent implements OnInit {
+  runtimeImages: RuntimeImage[] = [];
   isLoading = false;
 
   editorVisible = false;
   editorTitle = "";
-  /** Set when editing an existing environment; undefined when creating one. */
-  editingEid?: number;
+  /** Set when editing an existing runtimeImage; undefined when creating one. */
+  editingRiid?: number;
   draftName = "";
   draftDockerfile = "";
   isSaving = false;
 
   logsVisible = false;
   logsTitle = "";
-  logsEid?: number;
+  logsRiid?: number;
   logsText = "";
-  logsStatus?: EnvironmentStatus;
+  logsStatus?: RuntimeImageStatus;
   isLoadingLogs = false;
 
   private defaultDockerfile = "";
 
   constructor(
-    private environmentService: EnvironmentService,
+    private runtimeImageService: RuntimeImageService,
     private notificationService: NotificationService,
     private modalService: NzModalService
   ) {}
@@ -101,15 +108,15 @@ export class UserEnvironmentComponent implements OnInit {
     // polling forever on a page that is usually idle.
     timer(BUILD_POLL_INTERVAL_MS, BUILD_POLL_INTERVAL_MS)
       .pipe(
-        switchMap(() => this.environmentService.list()),
+        switchMap(() => this.runtimeImageService.list()),
         untilDestroyed(this)
       )
       .subscribe({
-        next: environments => {
-          if (this.anyBuilding(this.environments) || this.anyBuilding(environments)) {
-            this.environments = environments;
-            if (this.logsVisible && this.logsEid !== undefined) {
-              this.loadLogs(this.logsEid, false);
+        next: runtimeImages => {
+          if (this.anyBuilding(this.runtimeImages) || this.anyBuilding(runtimeImages)) {
+            this.runtimeImages = runtimeImages;
+            if (this.logsVisible && this.logsRiid !== undefined) {
+              this.loadLogs(this.logsRiid, false);
             }
           }
         },
@@ -119,18 +126,18 @@ export class UserEnvironmentComponent implements OnInit {
       });
   }
 
-  private anyBuilding(environments: Environment[]): boolean {
-    return environments.some(environment => environment.status === "BUILDING");
+  private anyBuilding(runtimeImages: RuntimeImage[]): boolean {
+    return runtimeImages.some(runtimeImage => runtimeImage.status === "BUILDING");
   }
 
   private loadDefaultDockerfile(): void {
-    this.environmentService
+    this.runtimeImageService
       .getDefaultDockerfile()
       .pipe(untilDestroyed(this))
       .subscribe({
         next: response => (this.defaultDockerfile = response.dockerfile),
         error: () => {
-          // Only affects what a new environment is pre-filled with, so an empty editor
+          // Only affects what a new runtimeImage is pre-filled with, so an empty editor
           // is a survivable outcome and not worth interrupting the user for.
         },
       });
@@ -138,24 +145,24 @@ export class UserEnvironmentComponent implements OnInit {
 
   refresh(): void {
     this.isLoading = true;
-    this.environmentService
+    this.runtimeImageService
       .list()
       .pipe(untilDestroyed(this))
       .subscribe({
-        next: environments => {
-          this.environments = environments;
+        next: runtimeImages => {
+          this.runtimeImages = runtimeImages;
           this.isLoading = false;
         },
         error: (error: unknown) => {
           this.isLoading = false;
-          this.notificationService.error(`Could not load environments: ${this.messageOf(error)}`);
+          this.notificationService.error(`Could not load runtime images: ${this.messageOf(error)}`);
         },
       });
   }
 
   onClickNew(): void {
-    this.editingEid = undefined;
-    this.editorTitle = "New environment";
+    this.editingRiid = undefined;
+    this.editorTitle = "New runtime image";
     this.draftName = "";
     // Pre-filled with the computing-unit image's own Dockerfile so the starting point is
     // what already exists, rather than a blank file the user has to guess the shape of.
@@ -163,17 +170,17 @@ export class UserEnvironmentComponent implements OnInit {
     this.editorVisible = true;
   }
 
-  onClickEdit(environment: Environment): void {
-    this.editingEid = environment.eid;
-    this.editorTitle = `Edit ${environment.name}`;
-    this.draftName = environment.name;
-    this.draftDockerfile = environment.dockerfile;
+  onClickEdit(runtimeImage: RuntimeImage): void {
+    this.editingRiid = runtimeImage.riid;
+    this.editorTitle = `Edit ${runtimeImage.name}`;
+    this.draftName = runtimeImage.name;
+    this.draftDockerfile = runtimeImage.dockerfile;
     this.editorVisible = true;
   }
 
   onClickSave(): void {
     const name = this.draftName.trim();
-    const nameError = validateEnvironmentName(name);
+    const nameError = validateRuntimeImageName(name);
     if (nameError) {
       this.notificationService.error(nameError);
       return;
@@ -185,20 +192,20 @@ export class UserEnvironmentComponent implements OnInit {
 
     this.isSaving = true;
     const save =
-      this.editingEid === undefined
-        ? this.environmentService.create(name, this.draftDockerfile)
-        : this.environmentService.update(this.editingEid, name, this.draftDockerfile);
+      this.editingRiid === undefined
+        ? this.runtimeImageService.create(name, this.draftDockerfile)
+        : this.runtimeImageService.update(this.editingRiid, name, this.draftDockerfile);
 
     save.pipe(untilDestroyed(this)).subscribe({
-      next: environment => {
+      next: runtimeImage => {
         this.isSaving = false;
         this.editorVisible = false;
-        this.notificationService.success(`Building '${environment.name}'. This takes a few minutes.`);
+        this.notificationService.success(`Building '${runtimeImage.name}'. This takes a few minutes.`);
         this.refresh();
       },
       error: (error: unknown) => {
         this.isSaving = false;
-        this.notificationService.error(`Could not save the environment: ${this.messageOf(error)}`);
+        this.notificationService.error(`Could not save the runtime image: ${this.messageOf(error)}`);
       },
     });
   }
@@ -207,34 +214,33 @@ export class UserEnvironmentComponent implements OnInit {
     this.editorVisible = false;
   }
 
-  onClickRebuild(environment: Environment): void {
-    this.environmentService
-      .rebuild(environment.eid)
+  onClickRebuild(runtimeImage: RuntimeImage): void {
+    this.runtimeImageService
+      .rebuild(runtimeImage.riid)
       .pipe(untilDestroyed(this))
       .subscribe({
         next: () => {
-          this.notificationService.success(`Rebuilding '${environment.name}'.`);
+          this.notificationService.success(`Rebuilding '${runtimeImage.name}'.`);
           this.refresh();
         },
-        error: (error: unknown) =>
-          this.notificationService.error(`Could not rebuild: ${this.messageOf(error)}`),
+        error: (error: unknown) => this.notificationService.error(`Could not rebuild: ${this.messageOf(error)}`),
       });
   }
 
-  onClickLogs(environment: Environment): void {
-    this.logsEid = environment.eid;
-    this.logsTitle = `Build log — ${environment.name}`;
+  onClickLogs(runtimeImage: RuntimeImage): void {
+    this.logsRiid = runtimeImage.riid;
+    this.logsTitle = `Build log — ${runtimeImage.name}`;
     this.logsText = "";
     this.logsVisible = true;
-    this.loadLogs(environment.eid, true);
+    this.loadLogs(runtimeImage.riid, true);
   }
 
-  private loadLogs(eid: number, showSpinner: boolean): void {
+  private loadLogs(riid: number, showSpinner: boolean): void {
     if (showSpinner) {
       this.isLoadingLogs = true;
     }
-    this.environmentService
-      .logs(eid)
+    this.runtimeImageService
+      .logs(riid)
       .pipe(untilDestroyed(this))
       .subscribe({
         next: response => {
@@ -251,32 +257,30 @@ export class UserEnvironmentComponent implements OnInit {
 
   onClickCloseLogs(): void {
     this.logsVisible = false;
-    this.logsEid = undefined;
+    this.logsRiid = undefined;
   }
 
-  onClickDelete(environment: Environment): void {
+  onClickDelete(runtimeImage: RuntimeImage): void {
     this.modalService.confirm({
-      nzTitle: `Delete '${environment.name}'?`,
-      nzContent:
-        "Computing units already started from this environment keep running; new ones cannot use it.",
+      nzTitle: `Delete '${runtimeImage.name}'?`,
+      nzContent: "Computing units already started from this runtime image keep running; new ones cannot use it.",
       nzOkText: "Delete",
       nzOkDanger: true,
       nzOnOk: () =>
-        this.environmentService
-          .delete(environment.eid)
+        this.runtimeImageService
+          .delete(runtimeImage.riid)
           .pipe(untilDestroyed(this))
           .subscribe({
             next: () => {
-              this.notificationService.success(`Deleted '${environment.name}'.`);
+              this.notificationService.success(`Deleted '${runtimeImage.name}'.`);
               this.refresh();
             },
-            error: (error: unknown) =>
-              this.notificationService.error(`Could not delete: ${this.messageOf(error)}`),
+            error: (error: unknown) => this.notificationService.error(`Could not delete: ${this.messageOf(error)}`),
           }),
     });
   }
 
-  statusColor(status: EnvironmentStatus): string {
+  statusColor(status: RuntimeImageStatus): string {
     switch (status) {
       case "READY":
         return "green";
@@ -289,8 +293,39 @@ export class UserEnvironmentComponent implements OnInit {
     }
   }
 
-  trackByEid(_index: number, environment: Environment): number {
-    return environment.eid;
+  /** Editing, rebuilding and publishing. Deleting additionally requires ownership. */
+  canEdit(runtimeImage: RuntimeImage): boolean {
+    return isEditable(runtimeImage);
+  }
+
+  canDelete(runtimeImage: RuntimeImage): boolean {
+    return isOwned(runtimeImage);
+  }
+
+  /** Only the owner decides who else may use it. */
+  canShare(runtimeImage: RuntimeImage): boolean {
+    return isOwned(runtimeImage);
+  }
+
+  onClickShare(runtimeImage: RuntimeImage): void {
+    const modal = this.modalService.create({
+      nzContent: ShareAccessComponent,
+      nzData: {
+        type: "runtime-image",
+        id: runtimeImage.riid,
+        allOwners: this.runtimeImages.map(e => e.ownerEmail).filter((email, i, all) => all.indexOf(email) === i),
+        inWorkspace: false,
+      },
+      nzFooter: null,
+      nzTitle: `Share "${runtimeImage.name}"`,
+    });
+    // Publishing happens inside the modal, so the card's Public tag is stale until the
+    // list is read again.
+    modal.afterClose.pipe(untilDestroyed(this)).subscribe(() => this.refresh());
+  }
+
+  trackByRiid(_index: number, runtimeImage: RuntimeImage): number {
+    return runtimeImage.riid;
   }
 
   private messageOf(error: unknown): string {

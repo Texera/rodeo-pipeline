@@ -1,0 +1,182 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
+<!-- Step 0: what you can do -->
+<div
+  class="welcome"
+  *ngIf="step === 0">
+  <div class="hero">
+    <div class="hero-mark">
+      <span
+        nz-icon
+        nzType="thunderbolt"
+        nzTheme="fill"></span>
+    </div>
+    <h2 class="hero-title">Welcome to Texera<span *ngIf="userName">, {{ userName }}</span></h2>
+    <p class="hero-subtitle">You can build and run workflows yourself — or let an AI assistant do it with you.</p>
+  </div>
+
+  <div class="choices">
+    <div class="choice">
+      <div class="choice-icon assistant">
+        <span
+          nz-icon
+          nzType="message"
+          nzTheme="outline"></span>
+      </div>
+      <h3>Built-in assistant</h3>
+      <p>
+        Already here. Open the chat from any workflow and ask it to explain an operator, write a UDF, or find what is
+        wrong with a run.
+      </p>
+      <span class="choice-tag ready">Ready to use</span>
+    </div>
+
+    <div class="choice">
+      <div class="choice-icon mcp">
+        <span
+          nz-icon
+          nzType="api"
+          nzTheme="outline"></span>
+      </div>
+      <h3>Your own chatbot</h3>
+      <p>
+        Connect Claude or ChatGPT to this account over MCP. It can create datasets, build a workflow operator by
+        operator, run it and read the results — on your canvas, as you watch.
+      </p>
+      <span class="choice-tag setup">Two minutes to set up</span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button
+      nz-button
+      nzType="default"
+      (click)="close()">
+      Explore on my own
+    </button>
+    <button
+      nz-button
+      nzType="primary"
+      (click)="showSetup()">
+      <span
+        nz-icon
+        nzType="api"></span>
+      Connect Claude or ChatGPT
+    </button>
+  </div>
+</div>
+
+<!-- Step 1: how to connect -->
+<div
+  class="setup"
+  *ngIf="step === 1">
+  <div class="setup-head">
+    <h2>Connect your chatbot</h2>
+    <p>Works with Claude Desktop, Claude Code, Cursor and any other MCP client.</p>
+  </div>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title">Open your client's MCP configuration</div>
+      <div class="step-body">
+        Claude Desktop keeps it in <code>claude_desktop_config.json</code>; Claude Code uses <code>.mcp.json</code>.
+        Most other clients use the same shape.
+      </div>
+    </li>
+
+    <li>
+      <div class="step-title">
+        Paste this in
+        <button
+          nz-button
+          nzType="link"
+          nzSize="small"
+          class="inline-action"
+          (click)="copyConfig()">
+          <span
+            nz-icon
+            nzType="copy"></span>
+          Copy
+        </button>
+      </div>
+      <div class="step-body">
+        <pre class="snippet">{{ displayedConfigSnippet }}</pre>
+      </div>
+    </li>
+
+    <li>
+      <div class="step-title">Your account token</div>
+      <div class="step-body">
+        <p class="token-note">
+          This is already inside the configuration above. It identifies you, so treat it like a password — anyone
+          holding it can act as you until it expires.
+        </p>
+        <div class="token-row">
+          <code class="token">{{ tokenRevealed ? token : maskedToken }}</code>
+          <button
+            nz-button
+            nzSize="small"
+            nz-tooltip="Show or hide the token"
+            (click)="toggleToken()">
+            <span
+              nz-icon
+              [nzType]="tokenRevealed ? 'eye-invisible' : 'eye'"></span>
+          </button>
+          <button
+            nz-button
+            nzSize="small"
+            nzType="primary"
+            (click)="copyToken()">
+            <span
+              nz-icon
+              nzType="copy"></span>
+            Copy
+          </button>
+        </div>
+      </div>
+    </li>
+
+    <li>
+      <div class="step-title">Restart the client and check it worked</div>
+      <div class="step-body">
+        Ask it: <em>“call texera_whoami”</em>. It should answer with your account name and this deployment. If it does,
+        everything else will work too.
+      </div>
+    </li>
+  </ol>
+
+  <div class="actions">
+    <button
+      nz-button
+      nzType="default"
+      (click)="back()">
+      <span
+        nz-icon
+        nzType="arrow-left"></span>
+      Back
+    </button>
+    <button
+      nz-button
+      nzType="primary"
+      (click)="close()">
+      Done
+    </button>
+  </div>
+</div>

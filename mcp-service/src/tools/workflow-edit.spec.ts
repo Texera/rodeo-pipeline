@@ -43,6 +43,13 @@ beforeEach(async () => {
       stored = { ...stored, ...body, lastModifiedTime: (stored.lastModifiedTime ?? 0) + 1000 };
       return json(stored);
     })
+    .post("/api/workflow/create", request => {
+      const body = JSON.parse(request.body ?? "{}");
+      // /create answers with the dashboard wrapper; /:wid answers with the flat
+      // workflow, and openSession fetches the latter straight afterwards.
+      stored = workflowResponse({ wid: 77, name: body.name, content: EMPTY_CONTENT });
+      return json({ workflow: stored, isPublished: false, accessLevel: "WRITE", ownerName: "tester" });
+    })
     .post("/api/compile", () =>
       json({
         operatorOutputSchemas: {
@@ -506,5 +513,89 @@ describe("multiple open workflows", () => {
     const error = await harness.callExpectingError("workflow_describe", { wid: 99 });
     expect(error).toContain("not open");
     expect(error).toContain("workflow_open(99)");
+  });
+});
+
+describe("workflow_create", () => {
+  test("hands back a link to the workflow", async () => {
+    // Building a graph takes minutes. Without the link the user has nothing to
+    // look at while it happens, which is the whole reason this is here.
+    const result = await harness.call("workflow_create", { name: "new one" });
+    expect(result).toContain("/user/workflow/77");
+  });
+
+  test("tells the assistant to hand over and wait rather than building straight on", async () => {
+    // A user who has not opened the canvas sees none of the build, and cannot
+    // correct the work while it is still cheap to change.
+    const result = await harness.call("workflow_create", { name: "new one" });
+    expect(result).toContain("STOP HERE");
+    expect(result).toContain("End your turn");
+  });
+
+  test("opens the workflow for editing so the edit tools have a session", async () => {
+    await harness.call("workflow_create", { name: "new one" });
+    // No wid argument: it resolves to the workflow just created.
+    expect(await harness.call("workflow_describe")).toContain("77");
+  });
+
+  test("reports the shared-editing room, the same as workflow_open", async () => {
+    // workflow_create used to open a session without joining the room, so the
+    // assistant edited detached and nothing appeared on the user's canvas.
+    const created = await harness.call("workflow_create", { name: "new one" });
+    const opened = await harness.call("workflow_open", { wid: 77 });
+    const mentionsRoom = (text: string) => /shared-editing room/.test(text);
+    expect(mentionsRoom(created)).toBe(mentionsRoom(opened));
+  });
+});
+
+describe("presence while editing", () => {
+  // recordEdit is what every editing tool funnels through, so the invariant is
+  // tested there rather than once per tool.
+  const fakeSession = () => {
+    const published: any[] = [];
+    return {
+      published,
+      session: {
+        dirty: false,
+        state: { getWorkflowContent: () => EMPTY_CONTENT },
+        live: {
+          connected: true,
+          replaceContent: () => {},
+          publishPresence: (a: any) => published.push(a),
+        },
+      } as any,
+    };
+  };
+
+  test("never shows more than one operator as being worked on", async () => {
+    // A client editing through an API has no pointer, so the halo is the only
+    // signal of where it is; two at once makes that signal meaningless.
+    const { recordEdit } = await import("../session");
+    const { published, session } = fakeSession();
+
+    recordEdit(session, { highlighted: ["a", "b", "c"] });
+
+    expect(published[0].highlighted).toEqual(["a"]);
+    expect(published[0].editing).toBe("a");
+  });
+
+  test("keeps an explicit editing target over the highlight list", async () => {
+    const { recordEdit } = await import("../session");
+    const { published, session } = fakeSession();
+
+    recordEdit(session, { editing: "target", highlighted: ["source", "target"] });
+
+    expect(published[0].editing).toBe("target");
+    expect(published[0].highlighted).toEqual(["target"]);
+  });
+
+  test("clears the halo when an edit names no operator", async () => {
+    const { recordEdit } = await import("../session");
+    const { published, session } = fakeSession();
+
+    recordEdit(session);
+
+    expect(published[0].editing).toBeUndefined();
+    expect(published[0].highlighted).toBeUndefined();
   });
 });

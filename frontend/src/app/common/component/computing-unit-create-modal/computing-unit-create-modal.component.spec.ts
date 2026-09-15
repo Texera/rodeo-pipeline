@@ -180,7 +180,9 @@ describe("ComputingUnitCreateModalComponent", () => {
       "4Gi",
       "0",
       "2G",
-      "128Mi"
+      "128Mi",
+      // No runtime image selected, so the unit starts from the deployment's default.
+      undefined
     );
     expect(mockNotificationService.success).toHaveBeenCalledWith("Successfully created the new compute unit");
     expect(unitCreatedSpy).toHaveBeenCalledWith(createdUnit);

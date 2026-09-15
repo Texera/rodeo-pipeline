@@ -94,20 +94,20 @@
         </div>
 
         <!-- Which image the unit runs. Absent means the deployment's default, which is
-             what almost every unit wants; an environment is for the cases it cannot cover. -->
+             what almost every unit wants; a runtime image is for the cases it cannot cover. -->
         <div
-          *ngIf="selectedComputingUnitType === 'kubernetes' && !environmentsUnavailable"
+          *ngIf="selectedComputingUnitType === 'kubernetes' && !runtimeImagesUnavailable"
           class="select-unit">
-          <span>Environment</span>
+          <span>Runtime image</span>
           <nz-select
-            class="environment-selection"
+            class="runtime-image-selection"
             nzAllowClear
             nzPlaceHolder="Default image"
-            [(ngModel)]="selectedEid">
+            [(ngModel)]="selectedRiid">
             <nz-option
-              *ngFor="let environment of startableEnvironments"
-              [nzValue]="environment.eid"
-              [nzLabel]="environment.name">
+              *ngFor="let runtimeImage of startableRuntimeImages"
+              [nzValue]="runtimeImage.riid"
+              [nzLabel]="runtimeImage.name">
             </nz-option>
           </nz-select>
         </div>

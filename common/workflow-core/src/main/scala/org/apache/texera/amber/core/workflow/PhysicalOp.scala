@@ -262,9 +262,10 @@ case class PhysicalOp(
     executionTimeBinding.map(_.opExecInitInfo).getOrElse(opExecInitInfo)
 
   /**
-    * Model versions this operator's workers must mount: variable name -> locator
-    * "<repositoryName>:<commitHash>". Forces the execution-time binding, with the same
-    * caveat as [[executableOpExecInitInfo]].
+    * Model versions that must be mounted for this operator: variable name -> locator
+    * "<repositoryName>:<commitHash>". Read by the region scheduler, which mounts the
+    * region's whole set at once. Forces the execution-time binding, with the same caveat
+    * as [[executableOpExecInitInfo]].
     */
   @JsonIgnore
   def mountedModels: Map[String, String] =

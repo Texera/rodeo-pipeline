@@ -19,6 +19,7 @@
 
 import { Component, HostListener, Input, OnDestroy, OnInit, OnChanges, SimpleChanges } from "@angular/core";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import { AiEditModeService } from "../../../service/ai-edit-mode/ai-edit-mode.service";
 import { NzResizeEvent, NzResizableDirective, NzResizeHandlesComponent } from "ng-zorro-antd/resizable";
 import { AgentService, AgentInfo } from "../../../service/agent/agent.service";
 import { WorkflowActionService } from "../../../service/workflow-graph/model/workflow-action.service";
@@ -96,11 +97,23 @@ export class AgentPanelComponent implements OnInit, OnDestroy, OnChanges {
   constructor(
     private agentService: AgentService,
     private workflowActionService: WorkflowActionService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private aiEditModeService: AiEditModeService
   ) {}
 
   ngOnInit(): void {
     this.loadPanelSettings();
+
+    // AI edit mode is only useful with the assistant visible, so undock it on
+    // the way in. The width the user had chosen is left untouched on exit.
+    this.aiEditModeService
+      .getActiveStream()
+      .pipe(untilDestroyed(this))
+      .subscribe(active => {
+        if (active && this.width === 0) {
+          this.openPanel();
+        }
+      });
 
     // Subscribe to agent changes
     this.agentService.agentChange$.pipe(untilDestroyed(this)).subscribe(() => {

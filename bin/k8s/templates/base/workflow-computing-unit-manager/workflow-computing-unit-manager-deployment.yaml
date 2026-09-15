@@ -72,27 +72,27 @@ spec:
               value: {{ .Values.mounter.hostMountRoot }}
             - name: KUBERNETES_IMAGE_NAME
               value: {{ .Values.texera.imageRegistry }}/{{ .Values.workflowComputingUnitPool.imageName }}:{{ .Values.texera.imageTag }}
-            # Environments: images built from a user-supplied Dockerfile.
-            - name: TEXERA_ENVIRONMENTS_ENABLED
-              value: "{{ .Values.environments.enabled }}"
-            - name: TEXERA_ENVIRONMENT_BUILDER_IMAGE
-              value: {{ .Values.environments.builderImage }}
-            - name: TEXERA_ENVIRONMENT_BUILD_NAMESPACE
-              value: {{ .Values.environments.buildNamespace }}
-            - name: TEXERA_ENVIRONMENT_BUILD_TIMEOUT_SECONDS
-              value: "{{ .Values.environments.buildTimeoutSeconds }}"
-            - name: TEXERA_ENVIRONMENT_REGISTRY
-              value: "{{ .Values.environmentRegistry.clusterIP }}:{{ .Values.environmentRegistry.port }}"
-            - name: TEXERA_ENVIRONMENT_BASE_IMAGE
-              value: {{ .Values.environments.baseImage }}
-            - name: TEXERA_ENVIRONMENT_BUILD_CPU_REQUEST
-              value: "{{ .Values.environments.buildCpuRequest }}"
-            - name: TEXERA_ENVIRONMENT_BUILD_MEMORY_REQUEST
-              value: "{{ .Values.environments.buildMemoryRequest }}"
-            - name: TEXERA_ENVIRONMENT_BUILD_CPU_LIMIT
-              value: "{{ .Values.environments.buildCpuLimit }}"
-            - name: TEXERA_ENVIRONMENT_BUILD_MEMORY_LIMIT
-              value: "{{ .Values.environments.buildMemoryLimit }}"
+            # Runtime images: the image a computing unit runs, built from a user Dockerfile.
+            - name: TEXERA_RUNTIME_IMAGES_ENABLED
+              value: "{{ .Values.runtimeImages.enabled }}"
+            - name: TEXERA_RUNTIME_IMAGE_BUILDER_IMAGE
+              value: {{ .Values.runtimeImages.builderImage }}
+            - name: TEXERA_RUNTIME_IMAGE_BUILD_NAMESPACE
+              value: {{ .Values.runtimeImages.buildNamespace }}
+            - name: TEXERA_RUNTIME_IMAGE_BUILD_TIMEOUT_SECONDS
+              value: "{{ .Values.runtimeImages.buildTimeoutSeconds }}"
+            - name: TEXERA_RUNTIME_IMAGE_REGISTRY
+              value: "{{ .Values.runtimeImageRegistry.clusterIP }}:{{ .Values.runtimeImageRegistry.port }}"
+            - name: TEXERA_RUNTIME_IMAGE_BASE_IMAGE
+              value: {{ .Values.runtimeImages.baseImage }}
+            - name: TEXERA_RUNTIME_IMAGE_BUILD_CPU_REQUEST
+              value: "{{ .Values.runtimeImages.buildCpuRequest }}"
+            - name: TEXERA_RUNTIME_IMAGE_BUILD_MEMORY_REQUEST
+              value: "{{ .Values.runtimeImages.buildMemoryRequest }}"
+            - name: TEXERA_RUNTIME_IMAGE_BUILD_CPU_LIMIT
+              value: "{{ .Values.runtimeImages.buildCpuLimit }}"
+            - name: TEXERA_RUNTIME_IMAGE_BUILD_MEMORY_LIMIT
+              value: "{{ .Values.runtimeImages.buildMemoryLimit }}"
             # TexeraDB Access
             - name: STORAGE_JDBC_URL
               value: jdbc:postgresql://{{ .Release.Name }}-postgresql:5432/texera_db?currentSchema=texera_db,public

@@ -17,13 +17,13 @@
   under the License.
 -->
 
-<div class="environment-page">
+<div class="runtime-image-page">
   <div class="page-header">
     <div>
-      <h2 class="page-title">Environments</h2>
+      <h2 class="page-title">Runtime images</h2>
       <p class="page-subtitle">
-        An environment is a Dockerfile and the image built from it. Start a computing unit from one to
-        run workflows against libraries, system packages or interpreters the default image does not have.
+        A runtime image is the image a computing unit runs, built from a Dockerfile you write. Start a computing unit
+        from one to run workflows against libraries, system packages or interpreters the default image does not have.
       </p>
     </div>
     <div class="page-actions">
@@ -43,43 +43,54 @@
         <span
           nz-icon
           nzType="plus"></span>
-        New environment
+        New runtime image
       </button>
     </div>
   </div>
 
   <div
-    *ngIf="!isLoading && environments.length === 0"
+    *ngIf="!isLoading && runtimeImages.length === 0"
     class="empty-state">
-    <p>No environments yet.</p>
-    <p class="empty-hint">
-      A new one starts from the computing-unit image, so you only add what your own code needs.
-    </p>
+    <p>No runtime images yet.</p>
+    <p class="empty-hint">A new one starts from the computing-unit image, so you only add what your own code needs.</p>
   </div>
 
-  <div class="environment-list">
+  <div class="runtime-image-list">
     <nz-card
-      *ngFor="let environment of environments; trackBy: trackByEid"
-      class="environment-card">
+      *ngFor="let runtimeImage of runtimeImages; trackBy: trackByRiid"
+      class="runtime-image-card">
       <div class="card-main">
         <div class="card-identity">
-          <span class="environment-name">{{ environment.name }}</span>
-          <nz-tag [nzColor]="statusColor(environment.status)">{{ environment.status }}</nz-tag>
+          <span class="runtime-image-name">{{ runtimeImage.name }}</span>
+          <nz-tag [nzColor]="statusColor(runtimeImage.status)">{{ runtimeImage.status }}</nz-tag>
+          <nz-tag
+            *ngIf="runtimeImage.isPublic"
+            nzColor="gold"
+            nz-tooltip="Anyone on Texera can start a computing unit from this image"
+            >Public</nz-tag
+          >
+          <nz-tag
+            *ngIf="!canShare(runtimeImage)"
+            nzColor="purple"
+            nz-tooltip="Shared with you by {{ runtimeImage.ownerEmail }}"
+            >Shared</nz-tag
+          >
           <span
-            *ngIf="environment.status === 'BUILDING'"
+            *ngIf="runtimeImage.status === 'BUILDING'"
             nz-icon
             nzType="loading"
             class="building-spinner"></span>
         </div>
 
         <div class="card-meta">
-          <span>Build #{{ environment.buildNumber }}</span>
-          <span *ngIf="environment.imageTag">·&nbsp;<code>{{ environment.imageTag }}</code></span>
-          <span>·&nbsp;Updated {{ environment.updateTime | date: "medium" }}</span>
+          <span>Build #{{ runtimeImage.buildNumber }}</span>
+          <span *ngIf="runtimeImage.imageTag">·&nbsp;<code>{{ runtimeImage.imageTag }}</code></span>
+          <span>·&nbsp;Updated {{ runtimeImage.updateTime | date: "medium" }}</span>
+          <span *ngIf="!canShare(runtimeImage)">·&nbsp;Owned by {{ runtimeImage.ownerEmail }}</span>
         </div>
 
         <div
-          *ngIf="environment.status === 'FAILED'"
+          *ngIf="runtimeImage.status === 'FAILED'"
           class="card-failure">
           The build failed. Open the log to see why, fix the Dockerfile, and save to rebuild.
         </div>
@@ -87,45 +98,62 @@
 
       <div class="card-actions">
         <!-- Always available, including long after the build finished: the log is kept on
-             the environment rather than only streamed while the build runs. -->
+             the runtime image rather than only streamed while the build runs. -->
         <button
           nz-button
           nzType="default"
           nzSize="small"
-          (click)="onClickLogs(environment)">
+          (click)="onClickLogs(runtimeImage)">
           <span
             nz-icon
             nzType="file-text"></span>
           Logs
         </button>
+        <!-- Read-only for a shared or public runtime image: it can be used and its
+             Dockerfile read, but only someone with write access may change it. -->
         <button
+          *ngIf="canEdit(runtimeImage)"
           nz-button
           nzType="default"
           nzSize="small"
-          (click)="onClickEdit(environment)">
+          (click)="onClickEdit(runtimeImage)">
           <span
             nz-icon
             nzType="edit"></span>
           Edit
         </button>
         <button
+          *ngIf="canEdit(runtimeImage)"
           nz-button
           nzType="default"
           nzSize="small"
-          [disabled]="environment.status === 'BUILDING'"
+          [disabled]="runtimeImage.status === 'BUILDING'"
           nz-tooltip="Build again without changing the Dockerfile"
-          (click)="onClickRebuild(environment)">
+          (click)="onClickRebuild(runtimeImage)">
           <span
             nz-icon
             nzType="redo"></span>
           Rebuild
         </button>
         <button
+          *ngIf="canShare(runtimeImage)"
+          nz-button
+          nzType="default"
+          nzSize="small"
+          nz-tooltip="Choose who else can start a computing unit from this image"
+          (click)="onClickShare(runtimeImage)">
+          <span
+            nz-icon
+            nzType="share-alt"></span>
+          Share
+        </button>
+        <button
+          *ngIf="canDelete(runtimeImage)"
           nz-button
           nzType="default"
           nzSize="small"
           nzDanger
-          (click)="onClickDelete(environment)">
+          (click)="onClickDelete(runtimeImage)">
           <span
             nz-icon
             nzType="delete"></span>
@@ -145,21 +173,19 @@
   (nzOnCancel)="onClickCancelEdit()">
   <ng-container *nzModalContent>
     <div class="editor-field">
-      <label for="environment-name">Name</label>
+      <label for="runtime-image-name">Name</label>
       <input
-        id="environment-name"
+        id="runtime-image-name"
         nz-input
         placeholder="e.g. alphafold3"
         [(ngModel)]="draftName" />
     </div>
 
     <div class="editor-field">
-      <label for="environment-dockerfile">Dockerfile</label>
-      <p class="editor-hint">
-        Saving builds this into an image. Editing an existing environment rebuilds it.
-      </p>
+      <label for="runtime-image-dockerfile">Dockerfile</label>
+      <p class="editor-hint">Saving builds this into an image. Editing an existing runtime image rebuilds it.</p>
       <textarea
-        id="environment-dockerfile"
+        id="runtime-image-dockerfile"
         class="dockerfile-editor"
         spellcheck="false"
         rows="22"

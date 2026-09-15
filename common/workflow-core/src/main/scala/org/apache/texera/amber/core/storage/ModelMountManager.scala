@@ -110,6 +110,20 @@ object ModelMountManager extends LazyLogging {
   }
 
   /**
+    * Ensure every locator in `locators` is mounted. This is the entry point the region
+    * scheduler calls once, before it hands any operator its code, so a region's mounts are
+    * deduplicated and performed in one place instead of once per worker.
+    *
+    * Warning: the mount runs in whatever process calls this, and a FUSE mount is only
+    * visible inside that process's mount namespace. It works today because the controller
+    * (scheduler) and all of a region's workers share a single computing-unit pod. Should
+    * workers ever become separate pods/nodes, mounting here would satisfy only the
+    * controller's pod, and this step -- and only this step -- would have to be dispatched
+    * to each worker's pod so the mount lands in that worker's namespace.
+    */
+  def ensureAllMounted(locators: Set[String]): Unit = locators.foreach(ensureMounted)
+
+  /**
     * Ensure the model version identified by the locator "<repositoryName>:<commitHash>"
     * is mounted, and return the local (in-pod) mount point. Thread-safe and idempotent.
     */

@@ -1,4 +1,4 @@
-{{- if .Values.environmentRegistry.enabled }}
+{{- if .Values.runtimeImageRegistry.enabled }}
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Registry for images built from user-supplied environment Dockerfiles.
+# Registry for runtime images built from user-supplied Dockerfiles.
 #
 # Two different clients have to agree on one address for an image, and they
 # resolve names differently: the BuildKit job pushing the image is a pod and uses
@@ -31,41 +31,41 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.environmentRegistry.name }}
+  name: {{ .Values.runtimeImageRegistry.name }}
   namespace: {{ .Release.Namespace }}
 spec:
   type: ClusterIP
-  clusterIP: {{ .Values.environmentRegistry.clusterIP }}
+  clusterIP: {{ .Values.runtimeImageRegistry.clusterIP }}
   selector:
-    app: {{ .Values.environmentRegistry.name }}
+    app: {{ .Values.runtimeImageRegistry.name }}
   ports:
     - name: registry
-      port: {{ .Values.environmentRegistry.port }}
+      port: {{ .Values.runtimeImageRegistry.port }}
       targetPort: 5000
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.environmentRegistry.name }}
+  name: {{ .Values.runtimeImageRegistry.name }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Values.environmentRegistry.name }}
+      app: {{ .Values.runtimeImageRegistry.name }}
   template:
     metadata:
       labels:
-        app: {{ .Values.environmentRegistry.name }}
+        app: {{ .Values.runtimeImageRegistry.name }}
     spec:
       containers:
         - name: registry
-          image: {{ .Values.environmentRegistry.image }}
+          image: {{ .Values.runtimeImageRegistry.image }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
           env:
-            # Rebuilding an environment reuses a tag, so the registry has to accept
+            # Rebuilding a runtime image reuses a tag, so the registry has to accept
             # an overwrite rather than reject it as immutable.
             - name: REGISTRY_STORAGE_DELETE_ENABLED
               value: "true"
@@ -80,24 +80,24 @@ spec:
             periodSeconds: 5
       volumes:
         - name: images
-          {{- if .Values.environmentRegistry.persistence.enabled }}
+          {{- if .Values.runtimeImageRegistry.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ .Values.environmentRegistry.name }}-pvc
+            claimName: {{ .Values.runtimeImageRegistry.name }}-pvc
           {{- else }}
           emptyDir: {}
           {{- end }}
-{{- if .Values.environmentRegistry.persistence.enabled }}
+{{- if .Values.runtimeImageRegistry.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Values.environmentRegistry.name }}-pvc
+  name: {{ .Values.runtimeImageRegistry.name }}-pvc
   namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.environmentRegistry.persistence.size }}
+      storage: {{ .Values.runtimeImageRegistry.persistence.size }}
 {{- end }}
 {{- end }}

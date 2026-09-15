@@ -26,7 +26,7 @@ import { UserProjectSectionComponent } from "./dashboard/component/user/user-pro
 import { UserProjectComponent } from "./dashboard/component/user/user-project/user-project.component";
 import { UserComputingUnitComponent } from "./dashboard/component/user/user-computing-unit/user-computing-unit.component";
 import { UserVenvComponent } from "./dashboard/component/user/user-venv/user-venv.component";
-import { UserEnvironmentComponent } from "./dashboard/component/user/user-environment/user-environment.component";
+import { UserRuntimeImageComponent } from "./dashboard/component/user/user-runtime-image/user-runtime-image.component";
 import { WorkspaceComponent } from "./workspace/component/workspace.component";
 import { AboutComponent } from "./hub/component/about/about.component";
 import { AuthGuardService } from "./common/service/user/auth-guard.service";
@@ -160,8 +160,8 @@ routes.push({
           component: UserVenvComponent,
         },
         {
-          path: "environment",
-          component: UserEnvironmentComponent,
+          path: "runtime-image",
+          component: UserRuntimeImageComponent,
         },
         {
           path: "quota",

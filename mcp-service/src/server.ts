@@ -26,6 +26,7 @@ import { registerExecutionTools } from "./tools/execution";
 import { registerModelTools } from "./tools/model";
 import { registerMountTools } from "./tools/mount";
 import { registerOperatorTools } from "./tools/operator";
+import { registerDemoTools } from "./tools/demo";
 import { registerSessionTools } from "./tools/session";
 import { registerSharingTools } from "./tools/sharing";
 import { registerWorkflowTools } from "./tools/workflow";
@@ -73,6 +74,13 @@ Opening a workflow also joins its shared-editing room, so the user sees you in t
 watches each edit appear on their canvas. Prefer many small edits over one big rewrite: it reads as work
 being done rather than as a graph appearing from nowhere.
 
+STOP after workflow_create and hand the workflow over before building it. Reply to the user in plain
+text with the link the tool returned, tell them you will build the workflow there, and ask them to open
+it. Then end your turn and call no further tools until they answer. Building a graph takes minutes of
+uninterrupted tool calls; a user who was not told to open the canvas first spends those minutes watching
+nothing happen, and cannot follow or correct the work while it is still cheap to change. Once they
+confirm, continue and build it.
+
 Operator types and their properties differ between deployments. Consult operator_list_types and
 operator_get_schema rather than assuming a type exists or guessing its property names.
 
@@ -94,6 +102,7 @@ export function createServer(context: McpContext): McpServer {
   registerOperatorTools(server, context);
   registerExecutionTools(server, context);
   registerSharingTools(server, context);
+  registerDemoTools(server, context);
 
   registerResources(server, context);
   registerPrompts(server);

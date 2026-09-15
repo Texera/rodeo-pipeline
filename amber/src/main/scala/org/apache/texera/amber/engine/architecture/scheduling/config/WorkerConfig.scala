@@ -47,8 +47,7 @@ case object WorkerConfig {
         VirtualIdentityUtils.createWorkerIdentity(physicalOp.workflowId, physicalOp.id, idx),
         pveName = physicalOp.pveName,
         cuid = cuid,
-        largeBinaryBaseUri = LargeBinaryManager.baseUriForExecution(physicalOp.executionId.id),
-        mountedModels = physicalOp.mountedModels
+        largeBinaryBaseUri = LargeBinaryManager.baseUriForExecution(physicalOp.executionId.id)
       )
     )
   }
@@ -60,9 +59,5 @@ case class WorkerConfig(
     cuid: Option[Int] = None,
     // Coordinator-named, execution-scoped base URI under which this worker's large binaries
     // live; create() appends a unique suffix. Empty when large binaries are unconfigured.
-    largeBinaryBaseUri: String = "",
-    // models to bind as local-path variables in the Python worker: variable name ->
-    // model-version locator "<repositoryName>:<commitHash>". Each is ensured mounted
-    // before the Python process starts; empty = no mounts.
-    mountedModels: Map[String, String] = Map.empty
+    largeBinaryBaseUri: String = ""
 )

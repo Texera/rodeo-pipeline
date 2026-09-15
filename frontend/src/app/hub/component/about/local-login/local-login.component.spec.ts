@@ -25,6 +25,7 @@ import { of, throwError } from "rxjs";
 
 import { LocalLoginComponent } from "./local-login.component";
 import { UserService } from "../../../../common/service/user/user.service";
+import { WelcomeService } from "../../../../common/service/welcome/welcome.service";
 import { NotificationService } from "../../../../common/service/notification/notification.service";
 import { GuiConfigService } from "../../../../common/service/gui-config.service";
 import { MockGuiConfigService } from "../../../../common/service/gui-config.service.mock";
@@ -39,13 +40,16 @@ describe("LocalLoginComponent", () => {
   let notificationServiceMock: Partial<NotificationService>;
   let routerMock: Partial<Router>;
   let activatedRouteMock: { snapshot: Partial<ActivatedRouteSnapshot> };
+  let welcomeServiceMock: { open: ReturnType<typeof vi.fn> };
 
   const createComponent = async (queryParams: Record<string, any> = {}) => {
     TestBed.resetTestingModule();
     userServiceMock = {
       login: vi.fn().mockReturnValue(of(undefined)),
       register: vi.fn().mockReturnValue(of(undefined)),
+      getCurrentUser: vi.fn().mockReturnValue({ uid: 7, name: "alice" }),
     };
+    welcomeServiceMock = { open: vi.fn() };
     notificationServiceMock = {
       error: vi.fn(),
       success: vi.fn(),
@@ -64,6 +68,7 @@ describe("LocalLoginComponent", () => {
         { provide: NotificationService, useValue: notificationServiceMock },
         { provide: Router, useValue: routerMock },
         { provide: ActivatedRoute, useValue: activatedRouteMock },
+        { provide: WelcomeService, useValue: welcomeServiceMock },
         ...commonTestProviders,
       ],
     }).compileComponents();
@@ -240,6 +245,25 @@ describe("LocalLoginComponent", () => {
       expect(userServiceMock.login).toHaveBeenCalledWith("alice", "secret");
       expect(routerMock.navigateByUrl).toHaveBeenCalledWith(USER_WORKFLOW);
       expect(component.loginErrorMessage).toBeUndefined();
+    });
+
+    it("opens the welcome dialog for the account that just signed in", () => {
+      vi.spyOn(UserService, "validateUsername").mockReturnValue({ result: true, message: "ok" });
+      component.allForms.patchValue({ loginUsername: "alice", loginPassword: "secret" });
+
+      component.login();
+
+      expect(welcomeServiceMock.open).toHaveBeenCalledWith("alice");
+    });
+
+    it("does not open the welcome dialog when the sign-in failed", () => {
+      vi.spyOn(UserService, "validateUsername").mockReturnValue({ result: true, message: "ok" });
+      vi.mocked(userServiceMock.login!).mockReturnValueOnce(throwError(() => new Error("boom")));
+      component.allForms.patchValue({ loginUsername: "alice", loginPassword: "secret" });
+
+      component.login();
+
+      expect(welcomeServiceMock.open).not.toHaveBeenCalled();
     });
 
     it("navigates to queryParams.returnUrl when present", async () => {

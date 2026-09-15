@@ -20,9 +20,9 @@
 package org.apache.texera.amber.engine.architecture.scheduling
 
 import org.apache.pekko.pattern.gracefulStop
-import com.twitter.util.{Future, JavaTimer, Return, Throw, Timer}
+import com.twitter.util.{Future, JavaTimer, Promise, Return, Throw, Timer}
 import org.apache.texera.amber.core.state.State
-import org.apache.texera.amber.core.storage.{DocumentFactory, VFSURIFactory}
+import org.apache.texera.amber.core.storage.{DocumentFactory, ModelMountManager, VFSURIFactory}
 import org.apache.texera.amber.core.virtualidentity.ActorVirtualIdentity
 import org.apache.texera.amber.core.workflow.{GlobalPortIdentity, PhysicalLink, PhysicalOp}
 import org.apache.texera.amber.engine.architecture.common.{
@@ -131,6 +131,10 @@ class RegionExecutionManager(
     Unexecuted
   )
   private val terminationFutureRef: AtomicReference[Future[Unit]] = new AtomicReference(null)
+  // A region's models are mounted at most once. Both launch phases funnel through the same
+  // `launchPhaseExecutionInternal`, so the second phase must not mount again -- and must not
+  // race ahead of the first phase's mount either, hence a shared future rather than a flag.
+  private val mountFutureRef: AtomicReference[Future[Unit]] = new AtomicReference(null)
 
   /**
     * Sync the status of `RegionExecution` and transition this manager's phase to `Completed` only when the
@@ -353,6 +357,40 @@ class RegionExecutionManager(
   }
 
   /**
+    * Gather the deduplicated set of model versions every operator in this region asks to
+    * mount, and mount them all before the region's operators are given their code. Runs at
+    * most once per region, and is operator-agnostic: an operator participates by populating
+    * `PhysicalOp.mountedModels` and carries no mount code of its own.
+    *
+    * This has to happen here rather than in a worker: a worker's actor -- and, for a Python
+    * UDF, its interpreter -- is already built in `initRegionExecution`, before any phase is
+    * launched, so a worker cannot be the one to guarantee the mount is in place. What it
+    * must precede is `initExecutors`, which ships the operator code with each mount path
+    * already substituted in; by then the paths have to be readable.
+    *
+    * Warning: see `ModelMountManager.ensureAllMounted` -- mounting from the controller's
+    * process is only correct while the controller and a region's workers share one
+    * computing-unit pod, which is today's model. Planning stays here in either case; only
+    * the execution step would move.
+    */
+  private def mountRegionModels(): Future[Unit] = {
+    // Claim the work before doing any of it. A plain flag would only guard *starting* the
+    // mount: the loser of the race would fall through and launch its executors without
+    // awaiting the mount the winner is still performing. Publishing the future instead
+    // means every later caller awaits the same one. Mirrors `terminationFutureRef`.
+    val mountFuture = Promise[Unit]()
+    if (mountFutureRef.compareAndSet(null, mountFuture)) {
+      mountFuture.become(Future {
+        val locators = region.getOperators.flatMap(_.mountedModels.values).toSet
+        if (locators.nonEmpty) {
+          ModelMountManager.ensureAllMounted(locators)
+        }
+      })
+    }
+    mountFutureRef.get
+  }
+
+  /**
     * Unified logic for launching either of the two phases asynchronously.
     */
   private def launchPhaseExecutionInternal(
@@ -383,6 +421,7 @@ class RegionExecutionManager(
       )
     )
     Future(())
+      .flatMap(_ => mountRegionModels())
       .flatMap(_ => initExecutors(operatorsToRun, resourceConfig))
       .flatMap(_ => assignPortsLogic())
       .flatMap(_ => connectChannelsLogic())

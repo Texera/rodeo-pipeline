@@ -157,5 +157,12 @@ export function recordEdit(session: EditSession, activity: { editing?: string; h
   session.dirty = true;
   if (!session.live?.connected) return;
   session.live.replaceContent(session.state.getWorkflowContent());
-  session.live.publishPresence(activity);
+  // At most one operator is ever shown as being worked on. A client that edits
+  // through an API has no pointer to follow, so the halo is the only signal of
+  // where it is; more than one at a time makes that signal meaningless.
+  const editing = activity.editing ?? activity.highlighted?.[0];
+  session.live.publishPresence({
+    editing,
+    highlighted: editing === undefined ? undefined : [editing],
+  });
 }

@@ -41,7 +41,7 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /api/environment
+            value: /api/runtime-image
       backendRefs:
         - name: workflow-computing-unit-manager-svc
           port: 8888
@@ -72,6 +72,9 @@ spec:
         - path:
             type: PathPrefix
             value: /api/access/computing-unit
+        - path:
+            type: PathPrefix
+            value: /api/access/runtime-image
       backendRefs:
         - name: workflow-computing-unit-manager-svc
           port: 8888

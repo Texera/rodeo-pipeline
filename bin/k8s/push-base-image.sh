@@ -16,14 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Publishes the computing-unit image into the in-cluster environment registry.
+# Publishes the computing-unit image into the in-cluster runtime image registry.
 #
-# Environment Dockerfiles build FROM this image, and the BuildKit job that builds
+# Runtime image Dockerfiles build FROM this image, and the BuildKit job that builds
 # them is a pod: it cannot see images that exist only in the node's local daemon,
 # so the base has to be in a registry it can pull from.
 #
 # Run once after installing the chart, and again whenever the engine image is
-# rebuilt -- environments built before that keep running the older base until
+# rebuilt -- runtime images built before that keep running the older base until
 # they are rebuilt themselves.
 #
 #   bin/k8s/push-base-image.sh [minikube-profile] [source-image]
@@ -32,7 +32,7 @@ set -euo pipefail
 
 PROFILE="${1:-texera-mount}"
 SOURCE_IMAGE="${2:-texera-local/texera-workflow-execution-coordinator:dev}"
-TARGET_IMAGE="${TEXERA_ENV_BASE_IMAGE:-10.96.0.99:5000/texera/computing-unit-master:dev}"
+TARGET_IMAGE="${TEXERA_RUNTIME_IMAGE_BASE_IMAGE:-10.96.0.99:5000/texera/computing-unit-master:dev}"
 
 echo "Publishing $SOURCE_IMAGE as $TARGET_IMAGE"
 echo

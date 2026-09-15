@@ -25,18 +25,87 @@ import {
   getComputingUnitLimitOptions,
   getComputingUnitTypes,
   isComputingUnitReady,
+  isRuntimeImageStartable,
   listComputingUnits,
+  listRuntimeImages,
   renameComputingUnit,
   runWorkflowSync,
   terminateComputingUnit,
   type DashboardWorkflowComputingUnit,
   type OperatorInfo,
+  type RuntimeImage,
   type SyncExecutionResult,
 } from "@texera/sdk";
 import type { McpContext } from "../context";
 import { ToolError } from "../errors";
 import { formatRecords, formatTable, formatTimestamp, joinSections } from "../format";
 import { registerTool } from "../register";
+
+/**
+ * Resolves a runtime image given either its riid or its name.
+ *
+ * Name rather than id only, if the caller has one: an assistant reading
+ * runtime_image_list has the name in front of it, and requiring it to carry an
+ * integer back is a step where it can go wrong. Names are unique per owner, so a
+ * name shared by two owners is reported rather than guessed at.
+ */
+async function resolveRuntimeImage(context: McpContext, requested: string | number): Promise<RuntimeImage> {
+  const images = await listRuntimeImages(context.client);
+
+  const asNumber = typeof requested === "number" ? requested : Number(requested);
+  const byId = Number.isInteger(asNumber) ? images.find(image => image.riid === asNumber) : undefined;
+
+  const wanted = String(requested).trim().toLowerCase();
+  const byName = images.filter(image => image.name.toLowerCase() === wanted);
+
+  if (byId === undefined && byName.length === 0) {
+    const startable = images.filter(isRuntimeImageStartable);
+    throw new ToolError(
+      `No runtime image "${requested}" is available to this account. ` +
+        (startable.length === 0
+          ? "runtime_image_list shows none that are ready to use."
+          : `Ready ones: ${startable.map(image => `${image.name} (riid ${image.riid})`).join(", ")}.`)
+    );
+  }
+  if (byId === undefined && byName.length > 1) {
+    throw new ToolError(
+      `"${requested}" matches more than one runtime image — ${byName
+        .map(image => `riid ${image.riid} owned by ${image.ownerEmail}`)
+        .join(", ")}. Pass the riid instead.`
+    );
+  }
+
+  const image = byId ?? byName[0]!;
+  if (!isRuntimeImageStartable(image)) {
+    throw new ToolError(
+      `Runtime image "${image.name}" is ${image.status}, not READY, so nothing can start from it yet.` +
+        (image.status === "BUILDING" ? " Its build is still running." : "")
+    );
+  }
+  return image;
+}
+
+/**
+ * The JVM heap to give a computing unit, in the notation the JVM accepts.
+ *
+ * Kubernetes memory notation is not JVM notation: a limit of "2Gi" passed
+ * through unchanged becomes -Xmx2Gi, which the JVM rejects outright with
+ * "Invalid maximum heap size" and the pod crash-loops before it starts. The
+ * workspace never had this problem because its slider emits "2G".
+ *
+ * Mirrors the workspace's own default (getJvmMemorySliderConfig): whole
+ * gigabytes, and 2G for anything above 1Gi, which leaves the container room for
+ * the JVM's off-heap use rather than handing the whole limit to the heap.
+ */
+export function jvmHeapFor(memoryLimit: string): string {
+  const amount = Number.parseFloat(memoryLimit);
+  if (!Number.isFinite(amount) || amount <= 0) return "1G";
+
+  const unit = memoryLimit.replace(/[\d.\s]/g, "");
+  const gib = unit === "Mi" || unit === "M" ? Math.max(1, Math.floor(amount / 1024)) : Math.floor(amount);
+
+  return `${gib <= 1 ? 1 : 2}G`;
+}
 
 /** Picks a running unit when the caller did not name one. */
 async function resolveComputingUnit(
@@ -178,13 +247,55 @@ export function registerExecutionTools(server: McpServer, context: McpContext): 
   });
 
   registerTool(server, context, {
+    name: "runtime_image_list",
+    title: "List runtime images",
+    description:
+      "Runtime images a computing unit can be started from: your own, ones shared with you, and public " +
+      "ones anybody may use. A runtime image is the container a unit runs, so it decides which Python, " +
+      "system tools and libraries a UDF has.\n\n" +
+      "Check this FIRST whenever a task needs something the default image does not have — a specific " +
+      "Python version, a scientific tool, a compiled binary. Starting from an existing READY image takes " +
+      "seconds; building a new one takes many minutes, so prefer a public image that already fits.\n" +
+      "Pass the name straight to computing_unit_create's runtime_image.",
+    inputSchema: {},
+    handler: async (_args: Record<string, never>, ctx) => {
+      const images = await listRuntimeImages(ctx.client);
+      if (images.length === 0) {
+        return "No runtime images are available to this account. Computing units will use the deployment's default image.";
+      }
+
+      const rows = images.map(image => [
+        image.riid,
+        image.name,
+        image.status,
+        isRuntimeImageStartable(image) ? "yes" : "no",
+        image.isPublic ? "public" : image.access === "OWNER" ? "yours" : "shared with you",
+        image.ownerEmail,
+      ]);
+
+      const ready = images.filter(isRuntimeImageStartable);
+      const hint =
+        ready.length === 0
+          ? "None are READY, so a computing unit cannot start from any of them yet."
+          : `Start a unit from one with computing_unit_create(runtime_image: "${ready[0]!.name}"), then ` +
+            `set defaultEnv=false and envName="${ready[0]!.name}" on any Python UDF that needs its libraries.`;
+
+      return joinSections(formatTable(["riid", "name", "status", "usable", "visibility", "owner"], rows), hint);
+    },
+  });
+
+  registerTool(server, context, {
     name: "computing_unit_create",
     title: "Start a computing unit",
     description:
       "Start a computing unit to run workflows on. Resource values must come from the deployment's allowed " +
       "list — call this without cpu/memory to see the options. On Kubernetes the unit is a pod and may take " +
       "a minute to become Running. On a single-node/local deployment the engine already runs, so pass uri " +
-      "to point the unit at it.",
+      "to point the unit at it.\n\n" +
+      "To run a workflow that needs libraries the default image lacks (a different Python, a system " +
+      "package, a compiled tool), pass runtime_image with the name or id of one from runtime_image_list. " +
+      "A public runtime image is already built — starting a unit from one costs nothing extra and is " +
+      "always faster than building your own.",
     inputSchema: {
       name: z.string().min(1).describe("Name for the unit"),
       cpu: z.string().optional().describe('CPU limit from the allowed list, e.g. "1"'),
@@ -198,9 +309,24 @@ export function registerExecutionTools(server: McpServer, context: McpContext): 
         .string()
         .optional()
         .describe('Required for "local" units: URL of the already-running engine, e.g. "http://localhost:8085".'),
+      runtime_image: z
+        .union([z.string(), z.number().int()])
+        .optional()
+        .describe(
+          'Runtime image to start the unit from, by name (e.g. "alphafold3") or riid. ' +
+            "Omit to use the deployment's default image. See runtime_image_list."
+        ),
     },
     handler: async (
-      args: { name: string; cpu?: string; memory?: string; gpu?: string; unit_type?: string; uri?: string },
+      args: {
+        name: string;
+        cpu?: string;
+        memory?: string;
+        gpu?: string;
+        unit_type?: string;
+        uri?: string;
+        runtime_image?: string | number;
+      },
       ctx
     ) => {
       const [limits, types] = await Promise.all([
@@ -239,22 +365,38 @@ export function registerExecutionTools(server: McpServer, context: McpContext): 
         }
       }
 
+      const image = args.runtime_image === undefined ? undefined : await resolveRuntimeImage(ctx, args.runtime_image);
+
       const created = await createComputingUnit(ctx.client, {
         name: args.name,
         unitType,
         cpuLimit: cpu,
         memoryLimit: memory,
         gpuLimit: gpu,
-        // Give the JVM most of the container, leaving headroom for off-heap use.
-        jvmMemorySize: memory,
+        // Not `memory`: that is a Kubernetes quantity ("2Gi") and the JVM will
+        // not start with -Xmx2Gi.
+        jvmMemorySize: jvmHeapFor(memory),
         shmSize: "64Mi",
         ...(args.uri !== undefined ? { uri: args.uri } : {}),
+        ...(image !== undefined ? { riid: image.riid } : {}),
       });
 
+      const startedFrom = image === undefined ? "the deployment's default image" : `runtime image "${image.name}"`;
+      // The single thing most likely to be missed: selecting a runtime image gives the
+      // unit the interpreter, but a UDF still has to ask for it, and a UDF that does not
+      // runs on the engine's own Python and fails on the first import.
+      const udfHint =
+        image === undefined
+          ? ""
+          : `\n\nUDFs that need this image's libraries must select its interpreter: set ` +
+            `defaultEnv to false and envName to "${image.name}" on every Python UDF operator. ` +
+            `Leaving defaultEnv true runs the UDF on the engine's own Python, which does not ` +
+            `have what this image installed.`;
       return (
         `Started computing unit ${created.computingUnit.cuid} "${created.computingUnit.name}" ` +
-        `(${unitType}, cpu ${cpu}, memory ${memory}) — status ${created.status}.\n` +
-        `Check computing_unit_list until it reads Running, then use it with workflow_run.`
+        `(${unitType}, cpu ${cpu}, memory ${memory}) from ${startedFrom} — status ${created.status}.\n` +
+        `Check computing_unit_list until it reads Running, then use it with workflow_run.` +
+        udfHint
       );
     },
   });

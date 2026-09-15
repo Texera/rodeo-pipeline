@@ -174,6 +174,32 @@ export function datasetResponse(
   };
 }
 
+export function runtimeImageResponse(
+  overrides: Partial<{
+    riid: number;
+    name: string;
+    status: string;
+    isPublic: boolean;
+    access: string;
+    ownerEmail: string;
+  }> = {}
+) {
+  return {
+    riid: 4,
+    name: "alphafold3",
+    dockerfile: "FROM base\n",
+    status: "READY",
+    imageTag: "registry/texera-runtime-image/4:3",
+    buildNumber: 3,
+    creationTime: 0,
+    updateTime: 0,
+    isPublic: true,
+    ownerEmail: "someone@else.com",
+    access: "READ",
+    ...overrides,
+  };
+}
+
 export function computingUnitResponse(overrides: Partial<{ cuid: number; name: string; status: string }> = {}) {
   return {
     computingUnit: {

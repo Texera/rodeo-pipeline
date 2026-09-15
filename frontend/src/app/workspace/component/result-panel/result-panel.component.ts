@@ -110,6 +110,7 @@ export class ResultPanelComponent implements OnInit, OnDestroy {
   previewWorkflowVersion: boolean = false;
 
   constructor(
+    private elementRef: ElementRef,
     private executeWorkflowService: ExecuteWorkflowService,
     private workflowActionService: WorkflowActionService,
     private workflowCompilingService: WorkflowCompilingService,
@@ -399,11 +400,30 @@ export class ResultPanelComponent implements OnInit, OnDestroy {
     return this.returnPosition.x === this.dragPosition.x && this.returnPosition.y === this.dragPosition.y;
   }
 
+  /**
+   * Stops the panel's visualisations from swallowing the pointer while the panel
+   * is being moved or resized.
+   *
+   * A visualisation is an <iframe>, and an iframe consumes the mouse events that
+   * happen over it: the parent document never sees the mousemove or, fatally,
+   * the mouseup. The drag then never ends and the panel follows the cursor
+   * around until something else interrupts it.
+   *
+   * `pointer-events: none` is what actually prevents that. Lowering z-index --
+   * which is what this used to do -- does not, because the iframe is still the
+   * element under the pointer and still receives the events.
+   */
+  private setVisualizationsInteractive(interactive: boolean): void {
+    const panel = this.elementRef.nativeElement as HTMLElement;
+    // Every iframe, not the first: one result panel shows a tab per operator, so
+    // there is an iframe per visualisation and the pointer may cross any of them.
+    panel.querySelectorAll("iframe").forEach(frame => {
+      (frame as HTMLIFrameElement).style.pointerEvents = interactive ? "" : "none";
+    });
+  }
+
   handleStartDrag() {
-    let visualizationResult = this.componentOutlets.nativeElement.querySelector("#html-content");
-    if (visualizationResult !== null) {
-      visualizationResult.style.zIndex = -1;
-    }
+    this.setVisualizationsInteractive(false);
   }
 
   handleEndDrag({ source }: CdkDragEnd) {
@@ -412,10 +432,17 @@ export class ResultPanelComponent implements OnInit, OnDestroy {
      */
     const { x, y } = source.getFreeDragPosition();
     this.dragPosition = { x: x, y: y };
-    let visualizationResult = this.componentOutlets.nativeElement.querySelector("#html-content");
-    if (visualizationResult !== null) {
-      visualizationResult.style.zIndex = 0;
-    }
+    this.setVisualizationsInteractive(true);
+  }
+
+  handleResizeStart(): void {
+    // Resizing drags an edge, so the pointer crosses the visualisation just as
+    // readily as moving the panel does.
+    this.setVisualizationsInteractive(false);
+  }
+
+  handleResizeEnd(): void {
+    this.setVisualizationsInteractive(true);
   }
 
   onResize({ width, height }: NzResizeEvent) {

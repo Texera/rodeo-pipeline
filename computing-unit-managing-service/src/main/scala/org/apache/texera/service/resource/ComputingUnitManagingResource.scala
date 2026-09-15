@@ -138,8 +138,8 @@ object ComputingUnitManagingResource {
       jvmMemorySize: String,
       shmSize: String,
       uri: Option[String] = None,
-      /** Environment to start this unit from. Absent uses the deployment's default image. */
-      eid: Option[Int] = None
+      /** Runtime image to start this unit from. Absent uses the deployment's default. */
+      riid: Option[Int] = None
   )
 
   case class WorkflowComputingUnitResourceLimit(
@@ -393,14 +393,15 @@ class ComputingUnitManagingResource {
         throw new ForbiddenException(s"Unsupported computing-unit type: ${param.unitType}")
     }
 
-    // Resolved before anything is written: starting from an environment whose image does
-    // not exist would leave a computing-unit row behind that can never run.
-    val environmentImage: Option[String] = param.eid.map { eid =>
-      EnvironmentResource
-        .readyImageFor(eid, user.getUid.intValue())
+    // Resolved before anything is written: starting from a runtime image that does not
+    // exist would leave a computing-unit row behind that can never run.
+    val runtimeImageTag: Option[String] = param.riid.map { riid =>
+      RuntimeImageResource
+        .readyImageFor(riid, user.getUid.intValue())
         .getOrElse(
           throw new ForbiddenException(
-            s"Environment $eid is not available. It must be one of yours and finished building."
+            s"Runtime image $riid is not available. It must be one you can use and " +
+              "finished building."
           )
         )
     }
@@ -430,12 +431,12 @@ class ComputingUnitManagingResource {
               "jvmMemorySize" -> param.jvmMemorySize,
               "shmSize" -> param.shmSize,
               // Recorded so the unit can say what it is running. The name is stored
-              // alongside the id because an environment can be deleted while a unit
+              // alongside the id because a runtime image can be deleted while a unit
               // started from it is still up, and "which image is this" should still
               // have an answer then.
-              "eid" -> param.eid,
-              "environmentName" -> param.eid.flatMap(EnvironmentResource.nameOf),
-              "environmentImage" -> environmentImage,
+              "riid" -> param.riid,
+              "runtimeImageName" -> param.riid.flatMap(RuntimeImageResource.nameOf),
+              "runtimeImageTag" -> runtimeImageTag,
               "nodeAddresses" -> Json.arr() // filled in later
             )
           )
@@ -509,7 +510,7 @@ class ComputingUnitManagingResource {
               EnvironmentalVariable.ENV_JAVA_OPTS -> s"-Xmx${param.jvmMemorySize}"
             ),
             Some(param.shmSize),
-            environmentImage
+            runtimeImageTag
           )
 
         } catch {

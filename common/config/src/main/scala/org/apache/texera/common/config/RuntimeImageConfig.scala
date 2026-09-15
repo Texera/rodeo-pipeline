@@ -21,49 +21,49 @@ package org.apache.texera.common.config
 import com.typesafe.config.{Config, ConfigFactory}
 
 /**
-  * Settings for environments -- images built from a user-supplied Dockerfile, which a
-  * computing unit can then be started from.
+  * Settings for runtime images -- the image a computing unit runs, built from a
+  * Dockerfile its owner wrote.
   *
   * Shares kubernetes.conf with [[KubernetesConfig]] because everything here is about
   * running a build on the same cluster that runs the computing units.
   */
-object EnvironmentConfig {
+object RuntimeImageConfig {
 
   private val conf: Config = ConfigFactory.parseResources("kubernetes.conf").resolve()
 
-  val enabled: Boolean = conf.getBoolean("environments.enabled")
+  val enabled: Boolean = conf.getBoolean("runtime-images.enabled")
 
-  val builderImage: String = conf.getString("environments.builder-image")
-  val buildNamespace: String = conf.getString("environments.build-namespace")
+  val builderImage: String = conf.getString("runtime-images.builder-image")
+  val buildNamespace: String = conf.getString("runtime-images.build-namespace")
 
   /** Host:port that built images are pushed to and pulled from. */
-  val registry: String = conf.getString("environments.registry")
+  val registry: String = conf.getString("runtime-images.registry")
 
-  /** What a new environment's editor starts from, and what user Dockerfiles build FROM. */
-  val baseImage: String = conf.getString("environments.base-image")
+  /** What a new runtime image's editor starts from, and what user Dockerfiles build FROM. */
+  val baseImage: String = conf.getString("runtime-images.base-image")
 
-  val buildTimeoutSeconds: Int = conf.getInt("environments.build-timeout-seconds")
+  val buildTimeoutSeconds: Int = conf.getInt("runtime-images.build-timeout-seconds")
 
-  val buildCpuRequest: String = conf.getString("environments.build-cpu-request")
-  val buildMemoryRequest: String = conf.getString("environments.build-memory-request")
-  val buildCpuLimit: String = conf.getString("environments.build-cpu-limit")
-  val buildMemoryLimit: String = conf.getString("environments.build-memory-limit")
+  val buildCpuRequest: String = conf.getString("runtime-images.build-cpu-request")
+  val buildMemoryRequest: String = conf.getString("runtime-images.build-memory-request")
+  val buildCpuLimit: String = conf.getString("runtime-images.build-cpu-limit")
+  val buildMemoryLimit: String = conf.getString("runtime-images.build-memory-limit")
 
   /**
     * The image reference a given build produces.
     *
-    * Keyed by environment id and build number rather than by name: the number means a
+    * Keyed by runtime image id and build number rather than by name: the number means a
     * rebuild publishes a new reference instead of mutating one that running pods were
-    * started from, and the id means renaming an environment cannot collide with another.
+    * started from, and the id means renaming a runtime image cannot collide with another.
     */
-  def imageTagFor(eid: Int, buildNumber: Int): String =
-    s"$registry/texera-env/$eid:$buildNumber"
+  def imageTagFor(riid: Int, buildNumber: Int): String =
+    s"$registry/texera-runtime-image/$riid:$buildNumber"
 
   /** Kubernetes object name for one build. Unique per build so retries never collide. */
-  def buildJobName(eid: Int, buildNumber: Int): String = s"env-build-$eid-$buildNumber"
+  def buildJobName(riid: Int, buildNumber: Int): String = s"runtime-image-build-$riid-$buildNumber"
 
   /**
-    * The Dockerfile a new environment is created with.
+    * The Dockerfile a new runtime image is created with.
     *
     * It is deliberately a working, complete file rather than a comment telling the user
     * what to do: the point of showing it is that they can see what the computing-unit
@@ -72,7 +72,7 @@ object EnvironmentConfig {
   def defaultDockerfile: String =
     s"""# The computing-unit image. Everything Texera needs to run a workflow -- the Amber
        |# engine, its Python worker and that worker's dependencies -- is already in here,
-       |# so an environment only has to add what your own code needs.
+       |# so a runtime image only has to add what your own code needs.
        |#
        |# Keep this FROM line: an image that does not build on it cannot run as a
        |# computing unit.
@@ -82,7 +82,7 @@ object EnvironmentConfig {
        |# end -- a computing unit that runs as root would be a privilege escalation.
        |USER root
        |
-       |# System packages go here. This is the whole reason environments exist: a Python
+       |# System packages go here. This is the whole reason runtime images exist: a Python
        |# virtual environment could never install one.
        |# RUN apt-get update && apt-get install -y --no-install-recommends \\
        |#       your-package \\

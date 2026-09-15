@@ -55,6 +55,7 @@ import { ComputingUnitStatusService } from "../../../common/service/computing-un
 import { ComputingUnitState } from "../../../common/type/computing-unit-connection.interface";
 import { ComputingUnitSelectionComponent } from "../power-button/computing-unit-selection.component";
 import { GuiConfigService } from "../../../common/service/gui-config.service";
+import { AiEditModeService } from "../../service/ai-edit-mode/ai-edit-mode.service";
 import { DashboardWorkflowComputingUnit } from "../../../common/type/workflow-computing-unit";
 import { Privilege } from "../../../dashboard/type/share-access.interface";
 import { MarkdownDescriptionComponent } from "../../../dashboard/component/user/markdown-description/markdown-description.component";
@@ -187,6 +188,7 @@ export class MenuComponent implements OnInit, OnDestroy {
     private panelService: PanelService,
     private computingUnitStatusService: ComputingUnitStatusService,
     protected config: GuiConfigService,
+    private aiEditModeService: AiEditModeService,
     private router: Router
   ) {
     workflowWebsocketService
@@ -844,4 +846,13 @@ export class MenuComponent implements OnInit, OnDestroy {
   }
 
   protected readonly Privilege = Privilege;
+
+  public get copilotEnabled(): boolean {
+    return this.config.env.copilotEnabled;
+  }
+
+  /** Hide every panel except the canvas, the results and the assistant. */
+  public onClickAiEditMode(): void {
+    this.aiEditModeService.toggle();
+  }
 }

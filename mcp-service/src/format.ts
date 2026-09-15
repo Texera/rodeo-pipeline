@@ -99,3 +99,14 @@ function stringifyCell(value: unknown): string {
 export function joinSections(...sections: (string | undefined | false)[]): string {
   return sections.filter((section): section is string => Boolean(section && section.trim())).join("\n\n");
 }
+
+/**
+ * The page a person opens to watch this workflow being edited.
+ *
+ * Handing this back as soon as a workflow exists matters more than it looks:
+ * building a graph takes minutes, and without the link the user has nothing to
+ * look at while it happens.
+ */
+export function workflowUrl(baseUrl: string, wid: number): string {
+  return `${baseUrl.replace(/\/+$/, "")}/user/workflow/${wid}`;
+}

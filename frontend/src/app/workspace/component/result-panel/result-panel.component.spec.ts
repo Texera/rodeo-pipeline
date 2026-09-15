@@ -284,21 +284,27 @@ describe("ResultPanelComponent", () => {
   });
 
   describe("drag", () => {
-    it("handleStartDrag hides the visualization overlay when it is present", () => {
-      const vizEl = { style: { zIndex: 0 } };
-      component.componentOutlets = {
-        nativeElement: { querySelector: () => vizEl },
-      } as unknown as ElementRef;
+    it("stops every visualization swallowing the pointer while dragging", () => {
+      // An iframe consumes the mouseup that ends a drag, so without this the
+      // panel keeps following the cursor after the button is released. Two of
+      // them, because one panel shows a tab per operator.
+      const host = fixture.nativeElement as HTMLElement;
+      const frames = [document.createElement("iframe"), document.createElement("iframe")];
+      frames.forEach(frame => host.appendChild(frame));
 
       component.handleStartDrag();
 
-      expect(vizEl.style.zIndex).toBe(-1);
+      expect(frames.every(frame => frame.style.pointerEvents === "none")).toBe(true);
+
+      component.handleEndDrag({
+        source: { getFreeDragPosition: () => ({ x: 0, y: 0 }) },
+      } as unknown as CdkDragEnd);
+      expect(frames.every(frame => frame.style.pointerEvents === "")).toBe(true);
+
+      frames.forEach(frame => frame.remove());
     });
 
     it("handleEndDrag records the final free-drag position", () => {
-      component.componentOutlets = {
-        nativeElement: { querySelector: () => null },
-      } as unknown as ElementRef;
       const source = { getFreeDragPosition: () => ({ x: 12, y: 34 }) };
 
       component.handleEndDrag({ source } as unknown as CdkDragEnd);
@@ -603,25 +609,32 @@ describe("ResultPanelComponent", () => {
   });
 
   describe("drag overlay restore", () => {
-    it("handleEndDrag restores the visualization overlay z-index when it is present", () => {
-      const vizEl = { style: { zIndex: -1 } };
-      component.componentOutlets = {
-        nativeElement: { querySelector: () => vizEl },
-      } as unknown as ElementRef;
+    it("gives the visualizations the pointer back once the drag ends", () => {
       const source = { getFreeDragPosition: () => ({ x: 7, y: 8 }) };
 
+      component.handleStartDrag();
       component.handleEndDrag({ source } as unknown as CdkDragEnd);
 
-      expect(vizEl.style.zIndex).toBe(0);
+      const frames = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll("iframe")
+      ) as HTMLIFrameElement[];
+      expect(frames.every(frame => frame.style.pointerEvents !== "none")).toBe(true);
       expect(component.dragPosition).toEqual({ x: 7, y: 8 });
     });
 
-    it("handleStartDrag is a no-op when no visualization overlay is present", () => {
-      component.componentOutlets = {
-        nativeElement: { querySelector: () => null },
-      } as unknown as ElementRef;
+    it("does the same for a resize, which drags an edge across the same iframes", () => {
+      component.handleResizeStart();
+      component.handleResizeEnd();
 
+      const frames = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll("iframe")
+      ) as HTMLIFrameElement[];
+      expect(frames.every(frame => frame.style.pointerEvents !== "none")).toBe(true);
+    });
+
+    it("is a no-op when the panel holds no visualization", () => {
       expect(() => component.handleStartDrag()).not.toThrow();
+      expect(() => component.handleResizeStart()).not.toThrow();
     });
   });
 

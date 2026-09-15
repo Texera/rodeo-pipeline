@@ -235,8 +235,10 @@ export class SharedWorkflowSession {
         clientId: String(this.provider.awareness.clientID),
       },
       isActive: true,
-      // The pointer is drawn at this position; parking it off the origin keeps
-      // it from sitting on top of the first operator.
+      // Required by the awareness shape, but meaningless for a client that edits
+      // through the API and never moves a pointer. The workspace does not draw a
+      // cursor for a participant whose user.isAgent is set, precisely because a
+      // fixed one would look like a frozen collaborator.
       userCursor: { x: 0, y: 0 },
       currentlyEditing: activity.editing,
       highlighted: activity.highlighted,

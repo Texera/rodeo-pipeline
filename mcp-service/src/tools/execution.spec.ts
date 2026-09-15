@@ -19,8 +19,9 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { FakeTexera, json, text } from "../testing/fake-texera";
-import { computingUnitResponse, OPERATOR_METADATA, workflowResponse } from "../testing/fixtures";
+import { computingUnitResponse, OPERATOR_METADATA, runtimeImageResponse, workflowResponse } from "../testing/fixtures";
 import { startHarness, type Harness } from "../testing/harness";
+import { jvmHeapFor } from "./execution";
 
 let deployment: FakeTexera;
 let harness: Harness;
@@ -54,7 +55,8 @@ beforeEach(async () => {
     )
     .get("/api/computing-unit/types", () => json({ typeOptions: ["kubernetes", "local"] }))
     .post("/api/computing-unit/create", () => json(computingUnitResponse({ cuid: 5, name: "new", status: "Pending" })))
-    .post("/api/execution/:wid/:cuid/run", () => json(successfulRun));
+    .post("/api/execution/:wid/:cuid/run", () => json(successfulRun))
+    .get("/api/runtime-image", () => json([runtimeImageResponse()]));
   harness = await startHarness(deployment);
 });
 
@@ -291,5 +293,112 @@ describe("workflow_run", () => {
   test("rejects a unit id the account cannot use", async () => {
     const error = await harness.callExpectingError("workflow_run", { computing_unit_id: 99 });
     expect(error).toContain("No computing unit 99");
+  });
+});
+
+describe("runtime_image_list", () => {
+  test("shows a public image owned by somebody else as usable", async () => {
+    const out = await harness.call("runtime_image_list");
+    expect(out).toContain("alphafold3");
+    expect(out).toContain("public");
+    expect(out).toContain("someone@else.com");
+  });
+
+  test("tells the caller how to select the image's interpreter in a UDF", async () => {
+    // Selecting the image gives the unit the interpreter; a UDF that does not ask
+    // for it still runs on the engine's Python and fails on the first import.
+    const out = await harness.call("runtime_image_list");
+    expect(out).toContain('envName="alphafold3"');
+  });
+
+  test("says so plainly when nothing is ready to start from", async () => {
+    deployment.get("/api/runtime-image", () => json([runtimeImageResponse({ status: "BUILDING" })]));
+    const out = await harness.call("runtime_image_list");
+    expect(out).toContain("None are READY");
+  });
+
+  test("reports an empty roster rather than an error", async () => {
+    deployment.get("/api/runtime-image", () => json([]));
+    expect(await harness.call("runtime_image_list")).toContain("No runtime images");
+  });
+});
+
+describe("computing_unit_create with a runtime image", () => {
+  test("accepts the image by name and reports what it started from", async () => {
+    const out = await harness.call("computing_unit_create", { name: "af", runtime_image: "alphafold3" });
+    expect(out).toContain('runtime image "alphafold3"');
+  });
+
+  test("accepts the image by riid too", async () => {
+    const out = await harness.call("computing_unit_create", { name: "af", runtime_image: 4 });
+    expect(out).toContain('runtime image "alphafold3"');
+  });
+
+  test("repeats the interpreter rule, which is the easiest thing to miss", async () => {
+    const out = await harness.call("computing_unit_create", { name: "af", runtime_image: "alphafold3" });
+    expect(out).toContain("defaultEnv");
+    expect(out).toContain('envName to "alphafold3"');
+  });
+
+  test("names the ready images when asked for one that does not exist", async () => {
+    const out = await harness.callExpectingError("computing_unit_create", { name: "af", runtime_image: "nope" });
+    expect(out).toContain("No runtime image");
+    expect(out).toContain("alphafold3 (riid 4)");
+  });
+
+  test("refuses an image whose build has not finished", async () => {
+    deployment.get("/api/runtime-image", () => json([runtimeImageResponse({ status: "BUILDING" })]));
+    const out = await harness.callExpectingError("computing_unit_create", {
+      name: "af",
+      runtime_image: "alphafold3",
+    });
+    expect(out).toContain("not READY");
+  });
+
+  test("says nothing about a runtime image when none was asked for", async () => {
+    const out = await harness.call("computing_unit_create", { name: "plain" });
+    expect(out).toContain("deployment's default image");
+    expect(out).not.toContain("envName");
+  });
+});
+
+describe("jvmHeapFor", () => {
+  test("never emits Kubernetes notation, which the JVM rejects", () => {
+    // -Xmx2Gi fails with "Invalid maximum heap size" and the pod crash-loops
+    // before the engine starts. Every Kubernetes unit created through this
+    // server hit that until the conversion was added.
+    for (const limit of ["1Gi", "2Gi", "4Gi", "512Mi", "8Gi"]) {
+      expect(jvmHeapFor(limit)).toMatch(/^\d+G$/);
+    }
+  });
+
+  test("leaves the container headroom rather than handing over the whole limit", () => {
+    expect(jvmHeapFor("4Gi")).toBe("2G");
+    expect(jvmHeapFor("8Gi")).toBe("2G");
+  });
+
+  test("does not exceed a one-gigabyte container", () => {
+    expect(jvmHeapFor("1Gi")).toBe("1G");
+    expect(jvmHeapFor("512Mi")).toBe("1G");
+  });
+
+  test("falls back to something startable when the limit is unparseable", () => {
+    expect(jvmHeapFor("")).toBe("1G");
+    expect(jvmHeapFor("lots")).toBe("1G");
+  });
+});
+
+describe("computing_unit_create heap size", () => {
+  test("sends the JVM a heap it will accept", async () => {
+    let body: any;
+    deployment.post("/api/computing-unit/create", request => {
+      body = JSON.parse(request.body ?? "{}");
+      return json(computingUnitResponse({ cuid: 5, name: "new", status: "Pending" }));
+    });
+
+    await harness.call("computing_unit_create", { name: "u", memory: "4Gi" });
+
+    expect(body.memoryLimit).toBe("4Gi");
+    expect(body.jvmMemorySize).toBe("2G");
   });
 });

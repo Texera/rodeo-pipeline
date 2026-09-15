@@ -58,6 +58,8 @@
   [style.width.px]="width"
   [style.height.px]="height"
   (nzResize)="onResize($event)"
+  (nzResizeStart)="handleResizeStart()"
+  (nzResizeEnd)="handleResizeEnd()"
   [cdkDragFreeDragPosition]="dragPosition"
   (cdkDragStarted)="handleStartDrag()"
   (cdkDragEnded)="handleEndDrag($event)">

@@ -34,10 +34,10 @@ import { NzAlertComponent } from "ng-zorro-antd/alert";
 import { WorkflowComputingUnitManagingService } from "../../service/computing-unit/workflow-computing-unit/workflow-computing-unit-managing.service";
 import { ComputingUnitActionsService } from "../../service/computing-unit/computing-unit-actions/computing-unit-actions.service";
 import {
-  Environment,
-  EnvironmentService,
+  RuntimeImage,
+  RuntimeImageService,
   isStartable,
-} from "../../../dashboard/service/user/environment/environment.service";
+} from "../../../dashboard/service/user/runtime-image/runtime-image.service";
 import { NotificationService } from "../../service/notification/notification.service";
 import { DashboardWorkflowComputingUnit, WorkflowComputingUnitType } from "../../type/workflow-computing-unit";
 import { extractErrorMessage } from "../../util/error";
@@ -108,11 +108,11 @@ export class ComputingUnitCreateModalComponent implements OnInit, OnChanges {
   availableComputingUnitTypes: WorkflowComputingUnitType[] = [];
   localComputingUnitUri: string = ""; // URI for local computing unit
 
-  // Environments the user can start a unit from. Only READY ones appear: an environment
+  // Runtime images the user can start a unit from. Only READY ones appear: one
   // still building has no image to pull, and a failed one never will.
-  startableEnvironments: Environment[] = [];
-  selectedEid?: number;
-  environmentsUnavailable = false;
+  startableRuntimeImages: RuntimeImage[] = [];
+  selectedRiid?: number;
+  runtimeImagesUnavailable = false;
 
   // JVM memory slider configuration
   jvmMemorySliderValue: number = 1; // Initial value in GB
@@ -134,30 +134,30 @@ export class ComputingUnitCreateModalComponent implements OnInit, OnChanges {
     private computingUnitService: WorkflowComputingUnitManagingService,
     private notificationService: NotificationService,
     private computingUnitActionsService: ComputingUnitActionsService,
-    private environmentService: EnvironmentService
+    private runtimeImageService: RuntimeImageService
   ) {}
 
-  private loadEnvironments(): void {
-    this.environmentService
+  private loadRuntimeImages(): void {
+    this.runtimeImageService
       .list()
       .pipe(untilDestroyed(this))
       .subscribe({
-        next: environments => {
-          this.startableEnvironments = environments.filter(isStartable);
-          this.environmentsUnavailable = false;
+        next: runtimeImages => {
+          this.startableRuntimeImages = runtimeImages.filter(isStartable);
+          this.runtimeImagesUnavailable = false;
         },
         error: () => {
-          // Environments may be disabled on this deployment, which must not stand in the
+          // Runtime images may be disabled on this deployment, which must not stand in the
           // way of creating an ordinary computing unit on the default image.
-          this.startableEnvironments = [];
-          this.environmentsUnavailable = true;
+          this.startableRuntimeImages = [];
+          this.runtimeImagesUnavailable = true;
         },
       });
   }
 
   ngOnInit(): void {
     // Fetch available computing unit types
-    this.loadEnvironments();
+    this.loadRuntimeImages();
     this.localComputingUnitUri = buildLocalComputingUnitUri(window.location);
     this.newComputingUnitName = "My Computing Unit";
     this.computingUnitService
@@ -293,7 +293,7 @@ export class ComputingUnitCreateModalComponent implements OnInit, OnChanges {
       jvmMemorySize: this.selectedJvmMemorySize,
       shmSize: `${this.shmSizeValue}${this.shmSizeUnit}`,
       localUri: this.localComputingUnitUri,
-      eid: this.selectedEid,
+      riid: this.selectedRiid,
     };
 
     this.computingUnitActionsService

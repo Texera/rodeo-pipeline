@@ -33,6 +33,7 @@ export * from "./api/model";
 export * from "./api/compile";
 export * from "./api/execution";
 export * from "./api/computing-unit";
+export * from "./api/runtime-image";
 export * from "./api/access";
 
 export * from "./graph/workflow-state";

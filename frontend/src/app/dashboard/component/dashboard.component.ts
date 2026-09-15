@@ -20,6 +20,7 @@
 import { Component, NgZone, OnInit, ViewChild } from "@angular/core";
 import { UserService } from "../../common/service/user/user.service";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import { AiEditModeService } from "../../workspace/service/ai-edit-mode/ai-edit-mode.service";
 import { FlarumService } from "../service/user/flarum/flarum.service";
 import { HttpErrorResponse } from "@angular/common/http";
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from "@angular/router";
@@ -40,7 +41,7 @@ import {
   USER_DISCUSSION,
   USER_PROJECT,
   USER_PYTHON_VENV,
-  USER_ENVIRONMENT,
+  USER_RUNTIME_IMAGE,
   USER_QUOTA,
   USER_WORKFLOW,
   USER_FEEDBACK,
@@ -91,6 +92,7 @@ export class DashboardComponent implements OnInit {
   displayForum: boolean = true;
   displayNavbar: boolean = true;
   isCollapsed: boolean = false;
+  aiEditMode = false;
   showLinks: boolean = false;
   logo: string = "";
   miniLogo: string = "";
@@ -120,7 +122,7 @@ export class DashboardComponent implements OnInit {
   protected readonly USER_MODEL = USER_MODEL;
   protected readonly USER_COMPUTING_UNIT = USER_COMPUTING_UNIT;
   protected readonly USER_PYTHON_VENV = USER_PYTHON_VENV;
-  protected readonly USER_ENVIRONMENT = USER_ENVIRONMENT;
+  protected readonly USER_RUNTIME_IMAGE = USER_RUNTIME_IMAGE;
   protected readonly USER_QUOTA = USER_QUOTA;
   protected readonly USER_DISCUSSION = USER_DISCUSSION;
   protected readonly USER_FEEDBACK = USER_FEEDBACK;
@@ -139,11 +141,19 @@ export class DashboardComponent implements OnInit {
     private socialAuthService: SocialAuthService,
     private route: ActivatedRoute,
     private adminSettingsService: AdminSettingsService,
-    protected config: GuiConfigService
+    protected config: GuiConfigService,
+    private aiEditModeService: AiEditModeService
   ) {}
 
   ngOnInit(): void {
     this.isCollapsed = false;
+
+    // AI edit mode hides the navigation sider: the workspace route renders
+    // inside this layout, so the workspace component cannot hide it itself.
+    this.aiEditModeService
+      .getActiveStream()
+      .pipe(untilDestroyed(this))
+      .subscribe(active => (this.aiEditMode = active));
 
     this.router.events.pipe(untilDestroyed(this)).subscribe(() => {
       this.checkRoute();

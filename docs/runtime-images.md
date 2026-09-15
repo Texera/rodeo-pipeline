@@ -17,12 +17,12 @@
   under the License.
 -->
 
-# Environments
+# Runtime images
 
-An **environment** is a Dockerfile a user owns and the image built from it. A computing
-unit started from an environment runs that image instead of the deployment's default one,
-so a workflow can use libraries, system packages and interpreters the default image
-does not have.
+A **runtime image** is the image a computing unit runs, built from a Dockerfile its owner
+wrote. A unit started from one runs that image instead of the deployment's default, so a
+workflow can use libraries, system packages and interpreters the default image does not
+have.
 
 ## Why this replaces Python virtual environments
 
@@ -30,7 +30,7 @@ A Python virtual environment (`virtual_environments`) can only add pip packages 
 interpreter that already exists in the computing-unit image. Three common needs fall
 outside that, and no amount of work within the mechanism reaches them:
 
-| Need | Why a venv cannot | An environment |
+| Need | Why a venv cannot | A runtime image |
 | --- | --- | --- |
 | A different Python version | `venv` is built from the image's own interpreter | `FROM` a different base, or install one |
 | A system package (`hmmer`, `ffmpeg`, a driver) | a venv holds Python packages only | `apt-get install` as root at build time |
@@ -46,24 +46,61 @@ migrated or removed.
 
 ## The flow
 
-1. **Environments** in the sidebar → **New environment**.
+1. **Runtime Images** in the sidebar → **New runtime image**.
 2. Give it a name. The editor is pre-filled with the computing-unit image's own
    Dockerfile, so the starting point is what already exists rather than a blank file.
 3. Saving starts a build. The card shows `BUILDING`; **Logs** shows the build's output and
    is readable at any point, during the build or long after it.
 4. **Edit** and save to rebuild. **Rebuild** repeats a build without editing.
-5. When creating a computing unit, pick the environment from the **Environment** dropdown.
-   Only `READY` environments appear — one still building has no image, and a failed one
+5. When creating a computing unit, pick it from the **Runtime image** dropdown.
+   Only `READY` runtime images appear — one still building has no image, and a failed one
    never will.
+
+## Sharing
+
+A runtime image starts private to whoever created it, and is shared the same two ways a
+dataset or a model is — the **Share** button on its card opens the same modal.
+
+**Named people.** Grant `READ` or `WRITE` by email. A `READ` grantee can start a computing
+unit from the image and read the Dockerfile that produced it; a `WRITE` grantee can also
+edit and rebuild it.
+
+**Everyone.** Publishing makes the image startable by every Texera user. It does not make
+the Dockerfile writable — publishing offers something to run, not something to rewrite.
+
+Unlike `dataset.is_public` and `model.is_public`, which default to `TRUE`, a runtime image
+defaults to **private**. An image is arbitrary instructions its owner wrote, so offering
+other people something to execute is a decision to take rather than a state to start in.
+
+Three limits are deliberate:
+
+| Action | Who |
+| --- | --- |
+| Start a computing unit, read the Dockerfile, read the build log | owner, any grantee, anyone if public |
+| Edit, rebuild, publish or unpublish | owner, `WRITE` grantee |
+| Delete, and change who it is shared with | owner only |
+
+**Delete is narrower than edit** because deleting takes the image away from everyone it
+was shared with. A `WRITE` grantee was given the right to change a runtime image, not to
+remove it from the people depending on it. Revoking your *own* grant is the exception that
+needs no write access — that is how you drop a shared runtime image off your list.
+
+A runtime image that is not yours is reported as **absent rather than forbidden**, so which
+ids exist is not something a stranger can map by reading status codes.
+
+Sharing reuses the machinery already behind datasets, models and computing units: the
+`runtime_image_user_access` table mirrors `dataset_user_access`, and the endpoints live at
+`/api/access/runtime-image/{list,grant,revoke,owner}` so the frontend's existing generic
+`ShareAccessService` addresses them with no new client code.
 
 ## How a build runs
 
 ```
-EnvironmentResource ──creates──▶ ConfigMap (Dockerfile + buildkitd.toml)
+RuntimeImageResource ──creates──▶ ConfigMap (Dockerfile + buildkitd.toml)
                     ──creates──▶ Job (BuildKit, rootless)
                                     │ pulls base image
                                     ▼
-                                 registry ◀── pushes <registry>/texera-env/<eid>:<n>
+                                 registry ◀── pushes <registry>/texera-runtime-image/<riid>:<n>
                                     │
                                     ▼
                           kubelet pulls it for the CU pod
@@ -77,7 +114,7 @@ well behaved. Rootless costs an unconfined seccomp/AppArmor profile and nothing 
 **One registry address for two different resolvers.** The BuildKit job pushing an image is
 a pod and resolves cluster DNS; the kubelet pulling it is not and does not. A ClusterIP is
 the one address both can reach, so the registry Service pins one
-(`environmentRegistry.clusterIP`) rather than being assigned one — an image reference
+(`runtimeImageRegistry.clusterIP`) rather than being assigned one — an image reference
 embeds the address, so it has to survive a reinstall of the chart.
 
 **The tag carries a build number.** A rebuild publishes `:<n+1>` rather than overwriting
@@ -89,27 +126,27 @@ background threads and leader election; the UI polls while a build is in flight 
 
 ## Setup
 
-The base image has to be in the registry before any environment can build, because the
+The base image has to be in the registry before any runtime image can build, because the
 BuildKit job is a pod and cannot see images that exist only in the node's local daemon:
 
 ```bash
 bin/k8s/push-base-image.sh [minikube-profile] [source-image]
 ```
 
-Run it again whenever the engine image is rebuilt. Environments built before that keep
+Run it again whenever the engine image is rebuilt. Runtime images built before that keep
 running the older base until they are rebuilt themselves.
 
 ## Configuration
 
 | Value | Default | Purpose |
 | --- | --- | --- |
-| `environments.enabled` | `true` | Turns the feature and its API off entirely |
-| `environments.builderImage` | `moby/buildkit:v0.18.2-rootless` | What runs the build |
-| `environments.buildNamespace` | the computing-unit pool namespace | Where build jobs run |
-| `environments.buildTimeoutSeconds` | `3600` | A build past this is killed |
-| `environments.baseImage` | `<registry>/texera/computing-unit-master:dev` | Pre-filled `FROM`, and what user Dockerfiles are expected to build on |
-| `environmentRegistry.clusterIP` | `10.96.0.99` | Pinned; must be inside the Service CIDR the container runtime treats as insecure |
-| `environmentRegistry.persistence.enabled` | `false` | Off means built images are lost if the registry pod restarts |
+| `runtimeImages.enabled` | `true` | Turns the feature and its API off entirely |
+| `runtimeImages.builderImage` | `moby/buildkit:v0.18.2-rootless` | What runs the build |
+| `runtimeImages.buildNamespace` | the computing-unit pool namespace | Where build jobs run |
+| `runtimeImages.buildTimeoutSeconds` | `3600` | A build past this is killed |
+| `runtimeImages.baseImage` | `<registry>/texera/computing-unit-master:dev` | Pre-filled `FROM`, and what user Dockerfiles are expected to build on |
+| `runtimeImageRegistry.clusterIP` | `10.96.0.99` | Pinned; must be inside the Service CIDR the container runtime treats as insecure |
+| `runtimeImageRegistry.persistence.enabled` | `false` | Off means built images are lost if the registry pod restarts |
 
 ## Known limits of this proof of concept
 
@@ -121,8 +158,12 @@ running the older base until they are rebuilt themselves.
   pod, because the pod spec sets no `securityContext` of its own. Before this is exposed to
   users who are not administrators, the pod spec should pin `runAsUser`/`runAsNonRoot` so
   the image cannot decide.
-- **No quota on images or builds.** Nothing limits how many environments a user creates, how
+- **No quota on images or builds.** Nothing limits how many runtime images a user creates, how
   large an image may be, or how long the registry keeps old build tags.
+- **Sharing widens the reach of the point above.** A published runtime image invites other
+  users to start a unit from an image its owner wrote, and nothing constrains what that
+  image does or which user it runs as. Pinning `runAsUser`/`runAsNonRoot` on the pod spec
+  matters more once a runtime image can be public than it did when one was private.
 - **The Dockerfile editor is a textarea**, not a syntax-highlighting editor.
-- **Deleting an environment leaves its images in the registry.** The rows and build jobs go;
+- **Deleting a runtime image leaves its images in the registry.** The rows and build jobs go;
   the pushed layers stay.

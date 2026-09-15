@@ -34,7 +34,7 @@ import {
 } from "@texera/sdk";
 import type { McpContext } from "../context";
 import { ToolError } from "../errors";
-import { formatTable, joinSections } from "../format";
+import { formatTable, joinSections, workflowUrl } from "../format";
 import { registerTool } from "../register";
 import { recordEdit, type EditSession } from "../session";
 import { suggestOperatorTypes } from "./operator";
@@ -63,7 +63,7 @@ const widArg = z
  * A failure to join is not a failure to open. The room is a nicety; falling
  * back to REST-only editing loses the live canvas, not the ability to work.
  */
-async function openSession(ctx: McpContext, wid: number): Promise<{ session: EditSession; liveNote?: string }> {
+export async function openSession(ctx: McpContext, wid: number): Promise<{ session: EditSession; liveNote?: string }> {
   const fetched = await retrieveWorkflowWithPrivilege(ctx.client, wid);
   let content = parseWorkflowContent(fetched.content);
 
@@ -297,6 +297,7 @@ export function registerWorkflowEditTools(server: McpServer, context: McpContext
       const { session, liveNote } = await openSession(ctx, args.wid);
       return joinSections(
         describeWorkflow(session),
+        `Open it here: ${workflowUrl(ctx.config.baseUrl, args.wid)}`,
         session.readonly
           ? "You have read-only access. Edits will be rejected; use workflow_duplicate for an editable copy."
           : undefined,
@@ -516,7 +517,9 @@ export function registerWorkflowEditTools(server: McpServer, context: McpContext
         target: { operatorID: target.operatorID, portID: toPortId },
       });
       autoLayoutWorkflow(session.state);
-      recordEdit(session, { highlighted: [args.from_operator_id, args.to_operator_id] });
+      // The downstream operator only, not both ends. Two halos at once reads as
+      // two things being worked on; the target is where the graph just grew.
+      recordEdit(session, { editing: args.to_operator_id, highlighted: [args.to_operator_id] });
 
       return (
         `Connected ${args.from_operator_id}:out${args.from_port ?? 0} -> ${args.to_operator_id}:in${args.to_port ?? 0}.\n` +

@@ -113,9 +113,9 @@ object PythonUdfUiParameterSupport {
     * know.
     *
     * Both results come out of one memoized resolution: the code, with each resource
-    * parameter rewritten to its mount path, and the locators the workers mount. The mount
-    * itself is left to the worker, which may run on a different node than whoever asked
-    * for this.
+    * parameter rewritten to its mount path, and the locators behind those paths. The mount
+    * itself is left to the region scheduler, which mounts every locator its operators name
+    * before it hands any of them this code.
     */
   private class PythonUdfExecutionBinding(
       code: String,

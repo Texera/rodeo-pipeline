@@ -19,6 +19,7 @@
 
 <nz-layout class="layout">
   <nz-sider
+    [class.ai-hidden]="aiEditMode"
     nzCollapsible
     [nzCollapsedWidth]="45"
     (nzCollapsedChange)="handleCollapseChange($event)"
@@ -126,11 +127,11 @@
             nz-tooltip="Build images a computing unit can run"
             nzMatchRouter="true"
             nzTooltipPlacement="right"
-            [routerLink]="USER_ENVIRONMENT">
+            [routerLink]="USER_RUNTIME_IMAGE">
             <span
               nz-icon
               nzType="container"></span>
-            <span>Environments</span>
+            <span>Runtime Images</span>
           </li>
           <li
             nz-menu-item

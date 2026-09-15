@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-.environment-page {
+.runtime-image-page {
   padding: 24px;
 }
 
@@ -54,13 +54,13 @@
   }
 }
 
-.environment-list {
+.runtime-image-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.environment-card {
+.runtime-image-card {
   ::ng-deep .ant-card-body {
     display: flex;
     align-items: center;
@@ -80,7 +80,7 @@
   gap: 8px;
 }
 
-.environment-name {
+.runtime-image-name {
   font-size: 16px;
   font-weight: 600;
 }

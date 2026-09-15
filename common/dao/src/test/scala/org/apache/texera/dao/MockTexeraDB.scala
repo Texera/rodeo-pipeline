@@ -102,6 +102,11 @@ trait MockTexeraDB extends TestSuiteMixin { this: TestSuite =>
   protected var dataSource: Option[HikariDataSource] = None
   protected var uniqueDbName: String = ""
 
+  private def withTexeraSchema(jdbcUrl: String): String = {
+    val separator = if (jdbcUrl.contains("?")) "&" else "?"
+    s"$jdbcUrl${separator}currentSchema=texera_db,public"
+  }
+
   def createHikariConfig(jbdcUrl: String): HikariConfig = {
     val hikariConfig = new HikariConfig()
     hikariConfig.setJdbcUrl(jbdcUrl)
@@ -132,7 +137,12 @@ trait MockTexeraDB extends TestSuiteMixin { this: TestSuite =>
           }
         }
 
-        val jdbcUrl = embedded.getJdbcUrl("postgres", uniqueDbName)
+        // Every service connects with currentSchema=texera_db,public -- see the
+        // deployment manifests and storage.conf -- and the DDL creates its tables in
+        // texera_db. Code that names a table without qualifying it resolves only because
+        // of that, so a test connection without it fails on a search_path difference
+        // rather than on anything the code under test does.
+        val jdbcUrl = withTexeraSchema(embedded.getJdbcUrl("postgres", uniqueDbName))
         val ds = new HikariDataSource(createHikariConfig(jbdcUrl = jdbcUrl))
         dataSource = Some(ds)
 

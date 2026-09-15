@@ -33,6 +33,12 @@ export interface WorkflowComputingUnit {
   terminateTime?: number | null;
   type?: string;
   uri?: string;
+  /**
+   * JSON blob the manager records alongside the unit: resource limits, and the
+   * runtime image it was started from (riid / runtimeImageName / runtimeImageTag).
+   * Returned by the API but not otherwise modelled, so callers parse what they need.
+   */
+  resource?: string;
 }
 
 export interface WorkflowComputingUnitMetrics {
@@ -70,6 +76,8 @@ export interface ComputingUnitCreationParams {
   jvmMemorySize: string;
   shmSize: string;
   uri?: string;
+  /** Runtime image to start from. Absent means the deployment's default image. */
+  riid?: number;
 }
 
 export async function listComputingUnits(client: TexeraClient): Promise<DashboardWorkflowComputingUnit[]> {

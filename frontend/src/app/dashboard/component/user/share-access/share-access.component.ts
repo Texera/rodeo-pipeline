@@ -27,10 +27,17 @@ import { GmailService } from "../../../../common/service/gmail/gmail.service";
 import { NZ_MODAL_DATA, NzModalRef, NzModalService } from "ng-zorro-antd/modal";
 import { NotificationService } from "../../../../common/service/notification/notification.service";
 import { HttpErrorResponse } from "@angular/common/http";
-import { USER_DATASET, USER_MODEL, USER_PROJECT, USER_WORKFLOW } from "../../../../app-routing.constant";
+import {
+  USER_DATASET,
+  USER_RUNTIME_IMAGE,
+  USER_MODEL,
+  USER_PROJECT,
+  USER_WORKFLOW,
+} from "../../../../app-routing.constant";
 import { NzMessageService } from "ng-zorro-antd/message";
 import { DatasetService } from "../../../service/user/dataset/dataset.service";
 import { ModelService } from "../../../service/user/model/model.service";
+import { RuntimeImageService } from "../../../service/user/runtime-image/runtime-image.service";
 import { WorkflowPersistService } from "src/app/common/service/workflow-persist/workflow-persist.service";
 import { WorkflowActionService } from "src/app/workspace/service/workflow-graph/model/workflow-action.service";
 import { NgIf, NgFor } from "@angular/common";
@@ -103,6 +110,7 @@ export class ShareAccessComponent implements OnInit, OnDestroy {
     private workflowPersistService: WorkflowPersistService,
     private datasetService: DatasetService,
     private modelService: ModelService,
+    private runtimeImageService: RuntimeImageService,
     private workflowActionService: WorkflowActionService,
     private modalRef: NzModalRef
   ) {
@@ -156,6 +164,13 @@ export class ShareAccessComponent implements OnInit, OnDestroy {
         .subscribe(dashboardModel => {
           this.isPublic = dashboardModel.model.isPublic;
         });
+    } else if (this.type === "runtime-image") {
+      this.runtimeImageService
+        .get(this.id)
+        .pipe(untilDestroyed(this))
+        .subscribe(environment => {
+          this.isPublic = environment.isPublic;
+        });
     }
   }
 
@@ -199,7 +214,11 @@ export class ShareAccessComponent implements OnInit, OnDestroy {
     if (this.emailTags.length > 0) {
       this.emailTags.forEach(email => {
         let message = `${this.userService.getCurrentUser()?.email} shared a ${this.type} with you`;
-        if (this.type !== "computing-unit") {
+        if (this.type === "runtime-image") {
+          // Environments are listed on one page rather than routed per id, so the link is
+          // to the list; appending the id would produce a route that does not resolve.
+          message += `, find it under Environments at ${location.origin}${USER_RUNTIME_IMAGE}`;
+        } else if (this.type !== "computing-unit") {
           let routePath = "";
           if (this.type === "workflow") routePath = USER_WORKFLOW;
           if (this.type === "dataset") routePath = USER_DATASET;
@@ -374,6 +393,8 @@ export class ShareAccessComponent implements OnInit, OnDestroy {
                 this.publishDataset();
               } else if (this.type === "model") {
                 this.publishModel();
+              } else if (this.type === "runtime-image") {
+                this.publishRuntimeImage();
               }
               modal.close();
             },
@@ -406,6 +427,8 @@ export class ShareAccessComponent implements OnInit, OnDestroy {
                 this.unpublishDataset();
               } else if (this.type === "model") {
                 this.unpublishModel();
+              } else if (this.type === "runtime-image") {
+                this.unpublishRuntimeImage();
               }
               modal.close();
             },
@@ -519,6 +542,44 @@ export class ShareAccessComponent implements OnInit, OnDestroy {
           next: () => {
             this.isPublic = false;
             this.notificationService.success("Model unpublished successfully");
+          },
+          error: (error: unknown) => {
+            if (error instanceof HttpErrorResponse) {
+              this.notificationService.error(error.error.message);
+            }
+          },
+        });
+    }
+  }
+
+  public publishRuntimeImage(): void {
+    if (!this.isPublic) {
+      this.runtimeImageService
+        .updateRuntimeImagePublicity(this.id)
+        .pipe(untilDestroyed(this))
+        .subscribe({
+          next: () => {
+            this.isPublic = true;
+            this.notificationService.success("Runtime image published successfully");
+          },
+          error: (error: unknown) => {
+            if (error instanceof HttpErrorResponse) {
+              this.notificationService.error(error.error.message);
+            }
+          },
+        });
+    }
+  }
+
+  public unpublishRuntimeImage(): void {
+    if (this.isPublic) {
+      this.runtimeImageService
+        .updateRuntimeImagePublicity(this.id)
+        .pipe(untilDestroyed(this))
+        .subscribe({
+          next: () => {
+            this.isPublic = false;
+            this.notificationService.success("Runtime image unpublished successfully");
           },
           error: (error: unknown) => {
             if (error instanceof HttpErrorResponse) {

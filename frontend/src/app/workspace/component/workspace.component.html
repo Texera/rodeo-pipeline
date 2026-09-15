@@ -28,13 +28,28 @@
 </div>
 <texera-workflow-editor></texera-workflow-editor>
 <texera-menu
+  [class.ai-hidden]="aiEditMode"
   [writeAccess]="writeAccess"
   [pid]="pid">
 </texera-menu>
-<texera-mini-map class="box"></texera-mini-map>
-<texera-left-panel> </texera-left-panel>
+<texera-mini-map
+  [class.ai-hidden]="aiEditMode"
+  class="box"></texera-mini-map>
+<texera-left-panel [class.ai-hidden]="aiEditMode"> </texera-left-panel>
 <texera-agent-panel
   *ngIf="copilotEnabled"
   [agentIdToActivate]="agentIdToActivate"></texera-agent-panel>
-<texera-property-editor></texera-property-editor>
+<texera-property-editor [class.ai-hidden]="aiEditMode"></texera-property-editor>
+<button
+  [class.ai-hidden]="!aiEditMode"
+  (click)="exitAiEditMode()"
+  id="ai-edit-mode-exit"
+  nz-button
+  title="Leave AI edit mode (Esc)">
+  <i
+    nz-icon
+    nzType="robot"
+    nzTheme="outline"></i>
+  AI edit mode — click or press Esc to exit
+</button>
 <ng-template #codeEditor></ng-template>

@@ -151,6 +151,17 @@
         </button>
       </nz-space-compact>
       <ng-template #utilities>
+        <button
+          *ngIf="copilotEnabled"
+          (click)="onClickAiEditMode()"
+          nz-button
+          class="ai-edit-mode-button"
+          title="AI edit mode — hide everything except the canvas, results and the assistant">
+          <i
+            nz-icon
+            nzType="robot"
+            nzTheme="outline"></i>
+        </button>
         <nz-space-compact>
           <button
             nz-dropdown

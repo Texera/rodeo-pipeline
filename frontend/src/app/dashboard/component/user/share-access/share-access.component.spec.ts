@@ -33,6 +33,7 @@ import { GmailService } from "../../../../common/service/gmail/gmail.service";
 import { NotificationService } from "../../../../common/service/notification/notification.service";
 import { DatasetService } from "../../../service/user/dataset/dataset.service";
 import { ModelService } from "../../../service/user/model/model.service";
+import { RuntimeImageService } from "../../../service/user/runtime-image/runtime-image.service";
 import { WorkflowPersistService } from "src/app/common/service/workflow-persist/workflow-persist.service";
 import { WorkflowActionService } from "src/app/workspace/service/workflow-graph/model/workflow-action.service";
 import { Privilege } from "../../../type/share-access.interface";
@@ -68,6 +69,10 @@ describe("ShareAccessComponent", () => {
     getModel: ReturnType<typeof vi.fn>;
     updateModelPublicity: ReturnType<typeof vi.fn>;
   };
+  let runtimeImageServiceSpy: {
+    get: ReturnType<typeof vi.fn>;
+    updateRuntimeImagePublicity: ReturnType<typeof vi.fn>;
+  };
   let workflowActionSpy: { setWorkflowIsPublished: ReturnType<typeof vi.fn> };
   let userServiceCurrentEmail: string | undefined;
   let capturedModalConfigs: any[];
@@ -95,6 +100,7 @@ describe("ShareAccessComponent", () => {
         { provide: WorkflowPersistService, useValue: workflowPersistSpy },
         { provide: DatasetService, useValue: datasetServiceSpy },
         { provide: ModelService, useValue: modelServiceSpy },
+        { provide: RuntimeImageService, useValue: runtimeImageServiceSpy },
         { provide: WorkflowActionService, useValue: workflowActionSpy },
       ],
     });
@@ -133,6 +139,10 @@ describe("ShareAccessComponent", () => {
     modelServiceSpy = {
       getModel: vi.fn().mockReturnValue(of({ model: { isPublic: false } })),
       updateModelPublicity: vi.fn().mockReturnValue(of(null)),
+    };
+    runtimeImageServiceSpy = {
+      get: vi.fn().mockReturnValue(of({ isPublic: false })),
+      updateRuntimeImagePublicity: vi.fn().mockReturnValue(of(null)),
     };
     workflowActionSpy = { setWorkflowIsPublished: vi.fn() };
   });
@@ -432,6 +442,51 @@ describe("ShareAccessComponent", () => {
       c.changeAccessLevel("me@example.com", "WRITE");
       expect(modalServiceSpy.create).not.toHaveBeenCalled();
       expect(accessServiceSpy.grantAccess).toHaveBeenCalled();
+    });
+  });
+
+  describe("runtime image", () => {
+    it("loads publish state via RuntimeImageService.get", () => {
+      runtimeImageServiceSpy.get.mockReturnValue(of({ isPublic: true }));
+      const c = setupComponent({ type: "runtime-image", id: 4 });
+      expect(runtimeImageServiceSpy.get).toHaveBeenCalledWith(4);
+      expect(c.isPublic).toBe(true);
+    });
+
+    it("keeps the publish toggle visible for a private environment", () => {
+      runtimeImageServiceSpy.get.mockReturnValue(of({ isPublic: false }));
+      const c = setupComponent({ type: "runtime-image", id: 4 });
+      // null would hide the toggle entirely; false renders it in the Private state.
+      expect(c.isPublic).toBe(false);
+    });
+
+    it("publishes on confirm", () => {
+      const c = setupComponent({ type: "runtime-image", id: 4 });
+      c.verifyPublish();
+      getFooterButton(capturedModalConfigs[0], "Publish").onClick();
+      expect(runtimeImageServiceSpy.updateRuntimeImagePublicity).toHaveBeenCalledWith(4);
+      expect(c.isPublic).toBe(true);
+    });
+
+    it("unpublishes on confirm", () => {
+      runtimeImageServiceSpy.get.mockReturnValue(of({ isPublic: true }));
+      const c = setupComponent({ type: "runtime-image", id: 4 });
+      c.verifyUnpublish();
+      getFooterButton(capturedModalConfigs[0], "Unpublish").onClick();
+      expect(runtimeImageServiceSpy.updateRuntimeImagePublicity).toHaveBeenCalledWith(4);
+      expect(c.isPublic).toBe(false);
+    });
+
+    it("links the share email to the Runtime Images list rather than a per-id route", () => {
+      const c = setupComponent({ type: "runtime-image", id: 4, currentEmail: "me@example.com" });
+      c.emailTags = ["them@example.com"];
+      c.grantAccess();
+
+      expect(accessServiceSpy.grantAccess).toHaveBeenCalledWith("runtime-image", 4, "them@example.com", "WRITE");
+      // Runtime images are listed on one page; appending the id would produce a dead link.
+      const body = gmailSpy.sendEmail.mock.calls[0][1] as string;
+      expect(body).toContain("/user/runtime-image");
+      expect(body).not.toContain("/runtime-image/4");
     });
   });
 

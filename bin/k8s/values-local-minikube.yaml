@@ -97,11 +97,7 @@ lakefs:
           access_key_id: texera_minio
           secret_access_key: password
 
-# AlphaFold 3 proof of concept (bin/demo/alphafold3/README.md). Built from
-# bin/dockerfiles/computing-unit-alphafold3.dockerfile into the node's daemon.
-#
-# The image is a property of the pool rather than of a computing unit, so this
-# switches it for every CU the manager creates -- there is no per-CU image
-# selection to point at just one of them.
-workflowComputingUnitPool:
-  imageName: computing-unit-alphafold3
+# The pool runs the stock engine image. Pinning the whole pool to a specialised
+# image is what runtime images replaced: a unit now names the image it wants at
+# creation, so AlphaFold 3 is reachable by starting a unit from the alphafold3
+# runtime image rather than by making every unit in the deployment carry it.

@@ -19,24 +19,22 @@
 import { TestBed } from "@angular/core/testing";
 import { HttpClientTestingModule, HttpTestingController } from "@angular/common/http/testing";
 
-import {
-  ENVIRONMENT_BASE_URL,
-  Environment,
-  EnvironmentService,
-  isStartable,
-} from "./environment.service";
+import { RUNTIME_IMAGE_BASE_URL, RuntimeImage, RuntimeImageService, isStartable } from "./runtime-image.service";
 import { commonTestProviders } from "../../../../common/testing/test-utils";
 
-function environment(overrides: Partial<Environment> = {}): Environment {
+function runtimeImage(overrides: Partial<RuntimeImage> = {}): RuntimeImage {
   return {
-    eid: 1,
+    riid: 1,
     name: "alphafold3",
     dockerfile: "FROM base\n",
     status: "READY",
-    imageTag: "10.96.0.99:5000/texera-env/1:1",
+    imageTag: "10.96.0.99:5000/texera-runtime-image/1:1",
     buildNumber: 1,
     creationTime: 0,
     updateTime: 0,
+    isPublic: false,
+    ownerEmail: "owner@texera.com",
+    access: "OWNER",
     ...overrides,
   };
 }
@@ -44,35 +42,35 @@ function environment(overrides: Partial<Environment> = {}): Environment {
 describe("isStartable", () => {
   it("accepts only a finished build", () => {
     // A computing unit started from anything else would have no image to pull.
-    expect(isStartable(environment({ status: "READY" }))).toBe(true);
-    expect(isStartable(environment({ status: "BUILDING" }))).toBe(false);
-    expect(isStartable(environment({ status: "FAILED" }))).toBe(false);
-    expect(isStartable(environment({ status: "PENDING" }))).toBe(false);
+    expect(isStartable(runtimeImage({ status: "READY" }))).toBe(true);
+    expect(isStartable(runtimeImage({ status: "BUILDING" }))).toBe(false);
+    expect(isStartable(runtimeImage({ status: "FAILED" }))).toBe(false);
+    expect(isStartable(runtimeImage({ status: "PENDING" }))).toBe(false);
   });
 });
 
-describe("EnvironmentService", () => {
-  let service: EnvironmentService;
+describe("RuntimeImageService", () => {
+  let service: RuntimeImageService;
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [EnvironmentService, ...commonTestProviders],
+      providers: [RuntimeImageService, ...commonTestProviders],
     });
-    service = TestBed.inject(EnvironmentService);
+    service = TestBed.inject(RuntimeImageService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => httpMock.verify());
 
-  it("lists environments", () => {
-    let received: Environment[] | undefined;
+  it("lists runtime images", () => {
+    let received: RuntimeImage[] | undefined;
     service.list().subscribe(result => (received = result));
 
-    const request = httpMock.expectOne(ENVIRONMENT_BASE_URL);
+    const request = httpMock.expectOne(RUNTIME_IMAGE_BASE_URL);
     expect(request.request.method).toBe("GET");
-    request.flush([environment()]);
+    request.flush([runtimeImage()]);
 
     expect(received?.length).toBe(1);
     expect(received?.[0].name).toBe("alphafold3");
@@ -81,44 +79,44 @@ describe("EnvironmentService", () => {
   it("creates with the name and Dockerfile", () => {
     service.create("af3", "FROM base\nRUN true\n").subscribe();
 
-    const request = httpMock.expectOne(ENVIRONMENT_BASE_URL);
+    const request = httpMock.expectOne(RUNTIME_IMAGE_BASE_URL);
     expect(request.request.method).toBe("POST");
     expect(request.request.body).toEqual({ name: "af3", dockerfile: "FROM base\nRUN true\n" });
-    request.flush(environment({ status: "BUILDING" }));
+    request.flush(runtimeImage({ status: "BUILDING" }));
   });
 
   it("updates through PUT, which is what triggers a rebuild", () => {
     service.update(7, "af3", "FROM base\n").subscribe();
 
-    const request = httpMock.expectOne(`${ENVIRONMENT_BASE_URL}/7`);
+    const request = httpMock.expectOne(`${RUNTIME_IMAGE_BASE_URL}/7`);
     expect(request.request.method).toBe("PUT");
-    request.flush(environment({ eid: 7 }));
+    request.flush(runtimeImage({ riid: 7 }));
   });
 
   it("rebuilds without a body", () => {
     service.rebuild(7).subscribe();
 
-    const request = httpMock.expectOne(`${ENVIRONMENT_BASE_URL}/7/rebuild`);
+    const request = httpMock.expectOne(`${RUNTIME_IMAGE_BASE_URL}/7/rebuild`);
     expect(request.request.method).toBe("POST");
-    request.flush(environment({ eid: 7 }));
+    request.flush(runtimeImage({ riid: 7 }));
   });
 
   it("reads the build log", () => {
     let log: string | undefined;
     service.logs(7).subscribe(result => (log = result.log));
 
-    const request = httpMock.expectOne(`${ENVIRONMENT_BASE_URL}/7/logs`);
+    const request = httpMock.expectOne(`${RUNTIME_IMAGE_BASE_URL}/7/logs`);
     expect(request.request.method).toBe("GET");
-    request.flush({ eid: 7, status: "READY", buildNumber: 2, log: "#1 DONE" });
+    request.flush({ riid: 7, status: "READY", buildNumber: 2, log: "#1 DONE" });
 
     expect(log).toBe("#1 DONE");
   });
 
-  it("fetches the default Dockerfile a new environment starts from", () => {
+  it("fetches the default Dockerfile a new runtime image starts from", () => {
     let dockerfile: string | undefined;
     service.getDefaultDockerfile().subscribe(result => (dockerfile = result.dockerfile));
 
-    const request = httpMock.expectOne(`${ENVIRONMENT_BASE_URL}/default-dockerfile`);
+    const request = httpMock.expectOne(`${RUNTIME_IMAGE_BASE_URL}/default-dockerfile`);
     request.flush({ baseImage: "registry/base:dev", dockerfile: "FROM registry/base:dev\n" });
 
     expect(dockerfile).toContain("FROM registry/base:dev");
@@ -127,7 +125,7 @@ describe("EnvironmentService", () => {
   it("deletes by id", () => {
     service.delete(7).subscribe();
 
-    const request = httpMock.expectOne(`${ENVIRONMENT_BASE_URL}/7`);
+    const request = httpMock.expectOne(`${RUNTIME_IMAGE_BASE_URL}/7`);
     expect(request.request.method).toBe("DELETE");
     request.flush(null);
   });
